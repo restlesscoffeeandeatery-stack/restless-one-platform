@@ -983,10 +983,11 @@ function _isGAS() {
 
 function cloudflareRun() {
   let success=()=>{},failure=()=>{},runner;
+  const readFns=new Set(['getDashboard','getBahanBaku','getProduk','getPreparations']);
   runner=new Proxy({
     withSuccessHandler(fn){success=typeof fn==='function'?fn:success;return runner;},
     withFailureHandler(fn){failure=typeof fn==='function'?fn:failure;return runner;}
-  },{get(target,name){if(name in target)return target[name];return(...args)=>{fetch(AIO_WORKER_URL+'/rpc',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8','X-Restless-Admin-Key':AIO_ADMIN_KEY},body:JSON.stringify({fn:String(name),args,adminKey:AIO_ADMIN_KEY}),cache:'no-store',credentials:'omit'}).then(response=>response.json()).then(result=>{if(!result.ok)throw new Error(result.error||'Cloudflare Worker gagal.');success(result.data);}).catch(failure);return runner;};}});
+  },{get(target,name){if(name in target)return target[name];return(...args)=>{const fn=String(name),key='restless_hpp_'+fn+'_'+JSON.stringify(args);if(readFns.has(fn)){try{const cached=JSON.parse(localStorage.getItem(key)||'null');if(cached){setTimeout(()=>success(cached),0);return runner}}catch(e){}}fetch(AIO_WORKER_URL+'/rpc',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8','X-Restless-Admin-Key':AIO_ADMIN_KEY},body:JSON.stringify({fn,args,adminKey:AIO_ADMIN_KEY}),cache:'no-store',credentials:'omit'}).then(response=>response.json()).then(result=>{if(!result.ok)throw new Error(result.error||'Cloudflare Worker gagal.');if(readFns.has(fn)){try{localStorage.setItem(key,JSON.stringify(result.data))}catch(e){}}else{Object.keys(localStorage).filter(k=>k.indexOf('restless_hpp_')===0).forEach(k=>localStorage.removeItem(k))}success(result.data);}).catch(failure);return runner;};}});
   return runner;
 }
 
@@ -995,6 +996,7 @@ function gasRun() {
   if (AIO_WORKER_URL) return cloudflareRun();
   return _isGAS() ? google.script.run : Object.create(_gasStub);
 }
+function clearHppReadCache(){try{Object.keys(localStorage).filter(k=>k.indexOf('restless_hpp_')===0).forEach(k=>localStorage.removeItem(k))}catch(e){}}
 
 // Banner preview — hanya muncul jika bukan GAS
 document.addEventListener('DOMContentLoaded', () => {
@@ -1310,6 +1312,7 @@ function renderBahan(items) {
 }
 
 function refreshBahan() {
+  clearHppReadCache();
   const btn = document.getElementById('btnRefreshBahan');
   btn.disabled = true;
   btn.textContent = '↺ Memuat…';

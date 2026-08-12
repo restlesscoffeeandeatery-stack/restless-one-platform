@@ -359,6 +359,10 @@ let kodeAkses = localStorage.getItem('restless_bahan_kode') || '';
 let namaUser = localStorage.getItem('restless_bahan_nama') || '';
 let daftarBahan = [];
 let bahanAktif = null;
+const STOCK_CACHE_KEY = 'restless_stock_snapshot_v2';
+function simpanSnapshotStok(){try{localStorage.setItem(STOCK_CACHE_KEY,JSON.stringify(daftarBahan))}catch(e){}}
+function pakaiSnapshotStok(){try{const data=JSON.parse(localStorage.getItem(STOCK_CACHE_KEY)||'null');if(Array.isArray(data)&&data.length){daftarBahan=data;renderBahanList();return true}}catch(e){}return false}
+function terapkanStokLokal(id,json){const item=daftarBahan.find(b=>String(b.id)===String(id));if(!item)return;if(json.stokAkhir!==undefined)item.stokAkhir=Number(json.stokAkhir)||0;if(json.hargaRataRata!==undefined)item.hargaRataRata=Number(json.hargaRataRata)||0;simpanSnapshotStok();renderBahanList()}
 
 // ============ INIT ============
 window.addEventListener('load', () => {
@@ -366,6 +370,7 @@ window.addEventListener('load', () => {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     document.getElementById('userLabel').innerText = namaUser ? ('Masuk sebagai ' + namaUser) : '';
+    pakaiSnapshotStok();
     muatDaftarBahan();
   } else {
     document.getElementById('loginScreen').style.display = 'block';
@@ -402,6 +407,7 @@ async function login() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     daftarBahan = json.data;
+    simpanSnapshotStok();
     renderBahanList();
   } catch (err) {
     document.getElementById('loginError').innerText = 'Gagal terhubung ke server.';
@@ -431,6 +437,7 @@ async function muatDaftarBahan() {
     const json = await res.json();
     if (json.sukses) {
       daftarBahan = json.data;
+      simpanSnapshotStok();
       renderBahanList();
     } else {
       showToast(json.pesan || 'Gagal memuat data');
@@ -554,7 +561,7 @@ async function submitStokMasuk() {
     if (json.sukses) {
       showToast('Stok masuk tersimpan');
       tutupModal();
-      muatDaftarBahan();
+      terapkanStokLokal(bahanAktif.id,json);
     } else {
       showToast(json.pesan || 'Gagal menyimpan');
     }
@@ -576,7 +583,7 @@ async function submitStokKeluar() {
     if (json.sukses) {
       showToast('Stok keluar tersimpan');
       tutupModal();
-      muatDaftarBahan();
+      terapkanStokLokal(bahanAktif.id,json);
     } else {
       showToast(json.pesan || 'Gagal menyimpan');
     }
@@ -649,7 +656,7 @@ async function submitCepatMasuk() {
     if (json.sukses) {
       showToast('Stok masuk tersimpan');
       tutupInputCepat();
-      muatDaftarBahan();
+      terapkanStokLokal(bahanId,json);
     } else {
       showToast(json.pesan || 'Gagal menyimpan');
     }
@@ -672,7 +679,7 @@ async function submitCepatKeluar() {
     if (json.sukses) {
       showToast('Stok keluar tersimpan');
       tutupInputCepat();
-      muatDaftarBahan();
+      terapkanStokLokal(bahanId,json);
     } else {
       showToast(json.pesan || 'Gagal menyimpan');
     }
