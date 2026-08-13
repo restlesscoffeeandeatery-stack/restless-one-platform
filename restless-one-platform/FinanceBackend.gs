@@ -324,6 +324,32 @@
     };
   }
 
+  function updateTransaction(payload) {
+    ensureDatabase_();
+    validateRequired_(payload, ['id', 'date', 'type', 'amount', 'description', 'category']);
+    if (['Pemasukan', 'Pengeluaran'].indexOf(payload.type) === -1) throw new Error('Tipe transaksi tidak valid.');
+    var amount = number_(payload.amount);
+    if (amount <= 0) throw new Error('Nominal harus lebih dari 0.');
+    var sheet = platformSS_().getSheetByName(SHEETS.TRANSACTIONS);
+    var row = findRowById_(sheet, clean_(payload.id));
+    if (!row) throw new Error('Transaksi tidak ditemukan.');
+    var previous = sheet.getRange(row, 1, 1, 15).getValues()[0];
+    var reference = clean_(previous[11] || '');
+    if (reference.indexOf('INVOICE:') === 0 || reference.indexOf('PAYROLL_RUN:') === 0) {
+      throw new Error('Transaksi otomatis invoice/payroll harus diubah dari modul asalnya.');
+    }
+    var accountId = clean_(payload.accountId || 'ACC-UTAMA');
+    assertActiveAccount_(accountId);
+    var sourceAccount = payload.type === 'Pengeluaran' ? accountId : '';
+    var destinationAccount = payload.type === 'Pemasukan' ? accountId : '';
+    sheet.getRange(row, 2, 1, 14).setValues([[
+      parseDate_(payload.date), payload.type, amount, clean_(payload.description), clean_(payload.category),
+      clean_(payload.subcategory || ''), clean_(payload.method || previous[7] || 'Transfer'), clean_(payload.note || ''),
+      sourceAccount, destinationAccount, reference, clean_(previous[12] || ''), previous[13] || new Date(), new Date()
+    ]]);
+    return { ok: true, refreshRequired: true, id: clean_(payload.id) };
+  }
+
   function saveCategory(payload) {
     ensureDatabase_();
     validateRequired_(payload, ['type', 'name']);

@@ -34,7 +34,7 @@ function normalize(finance = {}, inventory = {}, platform = {}) {
     id: String(t.id), date: t.date, type: uiType(t.type), category: t.category,
     description: t.description, accountId: t.type === 'Pemasukan' ? t.destinationAccount : t.sourceAccount,
     sourceAccount: t.sourceAccount || '', destinationAccount: t.destinationAccount || '',
-    amount: Number(t.amount || 0), status: 'Completed', notes: t.note || '', period: t.period || ''
+    amount: Number(t.amount || 0), status: 'Completed', notes: t.note || '', reference: t.reference || '', period: t.period || ''
   }));
   const rawInvoices = finance.invoices || [];
   const supplierNames = [...new Set(rawInvoices.map(i => String(i.supplier || i.client || '').trim()).filter(Boolean))];
@@ -72,8 +72,13 @@ function normalize(finance = {}, inventory = {}, platform = {}) {
     id: r.runId, period: `${r.start} – ${r.end}`, type: r.scheme === 'Fulltime' ? 'Full-time' : 'Part-time',
     date: r.end, status: r.status === 'POSTED' ? 'Paid' : 'Draft', totalAmount: Number(r.total || 0), employeesData: []
   }));
+  const payrollEmployees = (platform.payrollAdmin?.employees || []).map(e => ({ id: String(e.id), name: e.name,
+    type: String(e.type).toLowerCase().replace(/[-\s]/g, '') === 'fulltime' ? 'Full-time' : 'Part-time',
+    baseSalary: String(e.type).toLowerCase().replace(/[-\s]/g, '') === 'fulltime' ? Number(e.rate || 0) : 0,
+    dailyRate: String(e.type).toLowerCase().replace(/[-\s]/g, '') === 'parttime' ? Number(e.rate || 0) : 0,
+    rate: Number(e.rate || 0), status: e.status || 'Aktif', startDate: e.startDate || '' }));
   return { accounts, transactions, categories: finance.categories || [], invoices, suppliers, materials,
-    preparations, recipes, stockHistory, priceHistory: [], employees: [], attendanceData: [], payrollHistory,
+    preparations, recipes, stockHistory, priceHistory: [], employees: payrollEmployees, attendanceData: [], payrollHistory,
     budgets: finance.budgets || [], allocationRules: finance.allocationRules || [],
     summary: platform.summary || {}, syncLog: platform.sync || [] };
 }
@@ -130,12 +135,11 @@ export const useStore = create((set, get) => ({
     const selectedCategory = expenseCategories.find(c => !c.parent) || expenseCategories[0];
     if (!selectedCategory) throw new Error('Kategori pengeluaran belum tersedia.');
     const supplier = get().suppliers.find(s => s.id === invoiceData.supplierId);
-    await rpc('saveInvoice', { supplier: supplier?.name || invoiceData.supplierId, number: invoiceData.invoiceNo,
+    await rpc('saveSupplierInvoiceWithStock', { supplier: supplier?.name || invoiceData.supplierId, number: invoiceData.invoiceNo,
       invoiceDate: invoiceData.date, dueDate: invoiceData.dueDate, category: selectedCategory.parent || selectedCategory.name,
       subcategory: selectedCategory.parent ? selectedCategory.name : '', status: 'Draft', tax: 0, discount: 0,
-      items: items.map(item => ({ name: get().materials.find(m => m.id === item.materialId)?.name || item.materialId, qty: Number(item.quantity), price: Number(item.price) })) });
-    for (const item of items) await rpc('postStockMovement', getPin(), { materialId: item.materialId, type: 'MASUK', qty: Number(item.quantity), price: Number(item.price), date: invoiceData.date, category: 'Pembelian Supplier', note: invoiceData.invoiceNo });
-    get().addToast('Invoice supplier berhasil dibuat.'); await get().fetchState({ silent: true });
+      items: items.map(item => ({ materialId: item.materialId, name: get().materials.find(m => m.id === item.materialId)?.name || item.materialId, qty: Number(item.quantity), price: Number(item.price) })) });
+    get().addToast('Invoice tersimpan; stok dan harga rata-rata sudah diperbarui.'); await get().fetchState({ silent: true });
   },
 
   recordPayment: async (invoiceId, amount) => {
@@ -155,6 +159,12 @@ export const useStore = create((set, get) => ({
     const result = await rpc('postStockMovement', getPin(), { materialId, type: 'MASUK', qty: Number(quantity), price: Number(price), category: 'Stock In', date, note: notes });
     set({ materials: get().materials.map(m => m.id === materialId ? { ...m, stock: Number(result.stock || 0), latestPrice: Number(result.average || price), status: Number(result.stock || 0) <= 5 ? 'Low Stock' : 'In Stock' } : m), stockHistory: [{ id: `IN-${Date.now()}`, materialId, date, type: 'IN', category: 'Stock In', reference: notes, qtyIn: Number(quantity), qtyOut: 0, balance: Number(result.stock || 0) }, ...get().stockHistory] });
     get().addToast('Stok masuk berhasil dicatat.');
+  },
+
+  updateStockMovement: async form => {
+    await rpc('updateStockMovement', { id: form.id, qty: Number(form.quantity), price: Number(form.price || 0), date: form.date, category: form.category, note: form.notes || '' });
+    get().addToast('Pergerakan stok berhasil diperbarui.');
+    await get().fetchState({ silent: true });
   },
 
   addMaterial: async data => {
@@ -200,16 +210,37 @@ export const useStore = create((set, get) => ({
   syncAttendance: async () => {
     await rpc('syncReceivingAndAttendance', getPin());
     const live = await rpc('refreshPayrollLive', getPin(), '');
-    const employees = (live.payrollAdmin?.employees || []).map(e => ({ id: e.id, name: e.name, type: e.type === 'Fulltime' ? 'Full-time' : 'Part-time', baseSalary: e.type === 'Fulltime' ? Number(e.rate) : 0, dailyRate: e.type === 'Parttime' ? Number(e.rate) : 0, status: e.status }));
-    const attendanceData = (live.payrollAdmin?.attendance || []).map(a => ({ id: a.id, employeeId: a.employeeId, date: a.date, inTime: a.inTime, outTime: a.outTime, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, note: a.note || '', overtimeHours: a.overtimeHours, overtimeRate: a.overtimeRate }));
+    const employees = (live.payrollAdmin?.employees || []).map(e => { const full = String(e.type).toLowerCase().replace(/[-\s]/g, '') === 'fulltime'; return { id: String(e.id), name: e.name, type: full ? 'Full-time' : 'Part-time', rate: Number(e.rate), baseSalary: full ? Number(e.rate) : 0, dailyRate: full ? 0 : Number(e.rate), status: e.status, startDate: e.startDate }; });
+    const attendanceData = (live.payrollAdmin?.attendance || []).map(a => ({ id: a.id, employeeId: String(a.employeeId), date: a.date, inTime: a.inTime, outTime: a.outTime, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, note: a.note || '', overtimeHours: a.overtimeHours, overtimeRate: a.overtimeRate }));
     set({ employees, attendanceData }); get().addToast('Absensi dan payroll berhasil disinkronkan.');
   },
 
   loadPayroll: async () => {
-    const live = await rpc('refreshPayrollLive', getPin(), '');
-    const employees = (live.payrollAdmin?.employees || []).map(e => ({ id: e.id, name: e.name, type: e.type === 'Fulltime' ? 'Full-time' : 'Part-time', baseSalary: e.type === 'Fulltime' ? Number(e.rate) : 0, dailyRate: e.type === 'Parttime' ? Number(e.rate) : 0, status: e.status }));
-    const attendanceData = (live.payrollAdmin?.attendance || []).map(a => ({ id: a.id, employeeId: a.employeeId, date: a.date, inTime: a.inTime, outTime: a.outTime, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, note: a.note || '', overtimeHours: a.overtimeHours, overtimeRate: a.overtimeRate }));
+    const live = await rpc('getPayrollAdminData');
+    const payrollAdmin = live.payrollAdmin || live;
+    const employees = (payrollAdmin.employees || []).map(e => { const compact = String(e.type).toLowerCase().replace(/[-\s]/g, ''); const full = compact === 'fulltime'; return { id: String(e.id), name: e.name, type: full ? 'Full-time' : 'Part-time', rate: Number(e.rate), baseSalary: full ? Number(e.rate) : 0, dailyRate: full ? 0 : Number(e.rate), status: e.status, startDate: e.startDate }; });
+    const attendanceData = (payrollAdmin.attendance || []).map(a => ({ id: a.id, employeeId: String(a.employeeId), date: a.date, inTime: a.inTime, outTime: a.outTime, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, note: a.note || '', overtimeHours: a.overtimeHours, overtimeRate: a.overtimeRate }));
     set({ employees, attendanceData }); return live;
+  },
+
+  saveEmployee: async form => {
+    const type = form.type === 'Full-time' ? 'Fulltime' : 'Parttime';
+    const rate = type === 'Fulltime' ? Number(form.baseSalary || form.rate) : Number(form.dailyRate || form.rate);
+    await rpc('savePayrollEmployee', { id: form.id || '', name: form.name, type, rate, status: form.status || 'Aktif', startDate: form.startDate });
+    get().addToast(form.id ? 'Data karyawan diperbarui.' : 'Karyawan ditambahkan.');
+    await get().loadPayroll();
+  },
+
+  setEmployeeActive: async (employee, active) => {
+    await rpc('savePayrollEmployee', { id: employee.id, name: employee.name, type: employee.type === 'Full-time' ? 'Fulltime' : 'Parttime', rate: employee.type === 'Full-time' ? employee.baseSalary : employee.dailyRate, status: active ? 'Aktif' : 'Nonaktif', startDate: employee.startDate });
+    get().addToast(active ? 'Karyawan diaktifkan.' : 'Karyawan dinonaktifkan.');
+    await get().loadPayroll();
+  },
+
+  removeEmployee: async employeeId => {
+    const result = await rpc('removePayrollEmployee', employeeId);
+    get().addToast(result.archived ? 'Karyawan memiliki histori dan dinonaktifkan.' : 'Karyawan berhasil dihapus.');
+    await get().loadPayroll();
   },
 
   previewPayroll: async request => {
@@ -269,6 +300,13 @@ export const useStore = create((set, get) => ({
     await rpc('saveTransaction', { date: form.date, type, category: form.category, description: form.description,
       accountId: form.accountId, amount: Number(form.amount), note: form.notes || '', method: 'Transfer' });
     get().addToast('Transaksi berhasil disimpan.'); await get().fetchState({ silent: true });
+  },
+
+  updateTransaction: async form => {
+    const type = serverType(form.type);
+    await rpc('updateTransaction', { id: form.id, date: form.date, type, category: form.category, description: form.description,
+      accountId: form.accountId, amount: Number(form.amount), note: form.notes || '', method: 'Transfer' });
+    get().addToast('Transaksi berhasil diperbarui.'); await get().fetchState({ silent: true });
   }
 }));
 

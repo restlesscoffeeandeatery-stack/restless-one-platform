@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { formatRupiah } from '../../utils/format';
-import { Plus, Search, ArrowDownLeft, ArrowUpRight, ArrowRightLeft } from 'lucide-react';
+import { Plus, Search, ArrowDownLeft, ArrowUpRight, ArrowRightLeft, Pencil } from 'lucide-react';
 import Modal from '../../components/Modal';
 
 const Transactions = () => {
   const transactions = useStore(s => s.transactions);
   const accounts = useStore(s => s.accounts);
   const addTransaction = useStore(s => s.addTransaction);
+  const updateTransaction = useStore(s => s.updateTransaction);
   const categories = useStore(s => s.categories);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterAccount, setFilterAccount] = useState('');
+  const [editingId, setEditingId] = useState('');
 
   const [form, setForm] = useState({
     type: 'Expense', date: new Date().toISOString().split('T')[0],
@@ -22,9 +24,24 @@ const Transactions = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    await addTransaction(form);
+    if (editingId) await updateTransaction({ ...form, id: editingId });
+    else await addTransaction(form);
     setIsModalOpen(false);
+    setEditingId('');
     setForm({ type: 'Expense', date: new Date().toISOString().split('T')[0], category: '', description: '', accountId: '', amount: '', notes: '' });
+  };
+
+  const openAdd = () => {
+    setEditingId('');
+    setForm({ type: 'Expense', date: new Date().toISOString().split('T')[0], category: '', description: '', accountId: '', amount: '', notes: '' });
+    setIsModalOpen(true);
+  };
+
+  const openEdit = transaction => {
+    setEditingId(transaction.id);
+    setForm({ type: transaction.type, date: transaction.date, category: transaction.category || '', description: transaction.description || '',
+      accountId: transaction.accountId || '', amount: transaction.amount, notes: transaction.notes || '' });
+    setIsModalOpen(true);
   };
 
   const filtered = transactions.filter(t => {
@@ -45,7 +62,7 @@ const Transactions = () => {
     <div className="page-container">
       <div className="flex justify-between items-center mb-6">
         <h1 className="page-title" style={{ margin: 0 }}>Transactions</h1>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+        <button className="btn btn-primary" onClick={openAdd}>
           <Plus size={16} style={{ marginRight: 6 }} /> Add Transaction
         </button>
       </div>
@@ -79,11 +96,12 @@ const Transactions = () => {
                 <th>Account</th>
                 <th style={{ textAlign: 'right' }}>Amount</th>
                 <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-gray-400)' }}>No transactions found.</td></tr>
+                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-gray-400)' }}>No transactions found.</td></tr>
               )}
               {filtered.map(t => {
                 const acc = accounts.find(a => a.id === t.accountId);
@@ -104,6 +122,7 @@ const Transactions = () => {
                       {isCredit ? '+' : '-'}{formatRupiah(t.amount)}
                     </td>
                     <td><span className="badge badge-success">{t.status}</span></td>
+                    <td>{/^(INVOICE:|PAYROLL_RUN:)/.test(t.reference || '') ? <span className="text-xs text-gray-500">Otomatis</span> : <button type="button" className="btn btn-outline text-xs" onClick={() => openEdit(t)}><Pencil size={14} style={{ marginRight: 5 }}/>Edit</button>}</td>
                   </tr>
                 );
               })}
@@ -112,7 +131,7 @@ const Transactions = () => {
         </div>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Transaction">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Edit Transaction' : 'Add Transaction'}>
         <form onSubmit={handleSave}>
           <div className="modal-body flex-col gap-4">
             <div className="flex gap-4">
@@ -159,7 +178,7 @@ const Transactions = () => {
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Save Transaction</button>
+            <button type="submit" className="btn btn-primary">{editingId ? 'Save Changes' : 'Save Transaction'}</button>
           </div>
         </form>
       </Modal>

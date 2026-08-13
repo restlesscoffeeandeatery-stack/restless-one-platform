@@ -4,15 +4,20 @@ import { formatRupiah } from '../../utils/format';
 import { Calculator, CheckCircle } from 'lucide-react';
 import Modal from '../../components/Modal';
 
-const WEEKS = [
-  { label: 'Minggu 1 (1-7 Agu 2026)', days: 7, start: '2026-08-01', end: '2026-08-07' },
-  { label: 'Minggu 2 (8-14 Agu 2026)', days: 7, start: '2026-08-08', end: '2026-08-14' },
-  { label: 'Minggu 3 (15-21 Agu 2026)', days: 7, start: '2026-08-15', end: '2026-08-21' },
-  { label: 'Minggu 4 (22-28 Agu 2026)', days: 7, start: '2026-08-22', end: '2026-08-28' },
-];
+const iso = date => date.toISOString().slice(0, 10);
+const buildWeeks = () => {
+  const now = new Date(), day = now.getDay() || 7, monday = new Date(now);
+  monday.setDate(now.getDate() - day + 1);
+  return [-3, -2, -1, 0, 1].map(offset => {
+    const start = new Date(monday); start.setDate(monday.getDate() + offset * 7);
+    const end = new Date(start); end.setDate(start.getDate() + 6);
+    return { label: `${start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`, days: 7, start: iso(start), end: iso(end) };
+  }).reverse();
+};
+const WEEKS = buildWeeks();
 
 const PartTimePayroll = () => {
-  const employees = useStore(s => s.employees.filter(e => e.type === 'Part-time'));
+  const employees = useStore(s => s.employees.filter(e => e.type === 'Part-time' && String(e.status).toLowerCase() === 'aktif'));
   const savePayroll = useStore(s => s.savePayroll);
   const previewPayroll = useStore(s => s.previewPayroll);
   const payrollHistory = useStore(s => s.payrollHistory);
@@ -21,19 +26,34 @@ const PartTimePayroll = () => {
   const [selectedWeek, setSelectedWeek] = useState(WEEKS[1]);
   const [attendance, setAttendance] = useState({});
   const [calculated, setCalculated] = useState(null);
+  const [loadingPayroll, setLoadingPayroll] = useState(true);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  useEffect(() => { if (!employees.length) loadPayroll().catch(() => {}); }, [employees.length, loadPayroll]);
+  const applyPreview = result => {
+    setCalculated(result.employeesData.map(employee => ({ ...employee, dailyRate: employee.rate, days: employee.present })));
+    setAttendance(Object.fromEntries(result.employeesData.map(employee => [employee.id, employee.present])));
+  };
+
+  useEffect(() => {
+    let active = true;
+    setLoadingPayroll(true);
+    Promise.all([loadPayroll(), previewPayroll({ scheme: 'Parttime', start: selectedWeek.start, end: selectedWeek.end })])
+      .then(([, result]) => { if (active) applyPreview(result); })
+      .catch(error => { if (active) useStore.getState().addToast(error.message, 'error'); })
+      .finally(() => { if (active) setLoadingPayroll(false); });
+    return () => { active = false; };
+  }, []); // tarik sekali setiap halaman dibuka
 
   const handleAttendanceChange = (empId, days) => {
     setAttendance({ ...attendance, [empId]: Math.min(Number(days), selectedWeek.days) });
   };
 
   const handleCalculate = async () => {
+    setLoadingPayroll(true);
     try {
       const result = await previewPayroll({ scheme: 'Parttime', start: selectedWeek.start, end: selectedWeek.end });
-      setCalculated(result.employeesData.map(employee => ({ ...employee, dailyRate: employee.rate, days: employee.present })));
-      setAttendance(Object.fromEntries(result.employeesData.map(employee => [employee.id, employee.present])));
+      applyPreview(result);
     } catch (error) { useStore.getState().addToast(error.message, 'error'); }
+    finally { setLoadingPayroll(false); }
   };
 
   const handleConfirm = async () => {
@@ -63,8 +83,8 @@ const PartTimePayroll = () => {
               {WEEKS.map(w => <option key={w.label} value={w.label}>{w.label}</option>)}
             </select>
           </div>
-          <button className="btn btn-primary" onClick={handleCalculate}>
-            <Calculator size={16} style={{ marginRight: 6 }} /> Hitung Gaji
+          <button className="btn btn-primary" onClick={handleCalculate} disabled={loadingPayroll}>
+            <Calculator size={16} style={{ marginRight: 6 }} /> {loadingPayroll ? 'Memuat…' : 'Hitung Gaji'}
           </button>
         </div>
       </div>
@@ -77,6 +97,7 @@ const PartTimePayroll = () => {
             <tr><th>Karyawan</th><th>Jabatan</th><th>Rate Harian</th><th>Hari Hadir</th></tr>
           </thead>
           <tbody>
+            {!loadingPayroll && employees.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>Tidak ada karyawan Part-time aktif. Periksa Pengaturan → Data Karyawan.</td></tr>}
             {employees.map(emp => (
               <tr key={emp.id}>
                 <td className="font-medium">{emp.name}</td>

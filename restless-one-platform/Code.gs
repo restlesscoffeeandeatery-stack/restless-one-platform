@@ -53,14 +53,15 @@ function platformRpcDoPost_(payload){
   try{platformAuth_(payload.adminKey);}catch(authError){return platformRpcResponse_({ok:false,error:String(authError.message||authError)});}
   var handlers={
     verifyAdminLogin:verifyAdminLogin,getPlatformData:getPlatformData,getInventoryWorkspace:getInventoryWorkspace,getInvoices:getInvoices,
+    saveSupplierInvoiceWithStock:saveSupplierInvoiceWithStock,updateStockMovement:updateStockMovement,
     setInvoiceStatus:setInvoiceStatus,generatePayroll:generatePayroll,savePayrollAdjustments:savePayrollAdjustments,
     previewPayroll:previewPayroll,getPayrollRunDetail:getPayrollRunDetail,postPayroll:postPayroll,syncReceivingAndAttendance:syncReceivingAndAttendance,refreshPayrollLive:refreshPayrollLive,
     saveBahan:saveBahan,deleteBahan:deleteBahan,platformSaveProduk:platformSaveProduk,
     platformDeleteProduk:platformDeleteProduk,saveRecipe:saveRecipe,deleteRecipe:deleteRecipe,
-    postStockMovement:postStockMovement,savePayrollEmployee:savePayrollEmployee,
-    deletePayrollEmployee:deletePayrollEmployee,savePayrollAttendance:savePayrollAttendance,
+    postStockMovement:postStockMovement,getPayrollAdminData:getPayrollAdminData,savePayrollEmployee:savePayrollEmployee,
+    deletePayrollEmployee:deletePayrollEmployee,removePayrollEmployee:removePayrollEmployee,savePayrollAttendance:savePayrollAttendance,
     deletePayrollAttendance:deletePayrollAttendance,
-    getAppData:getAppData,getAppDataJson:getAppDataJson,saveTransaction:saveTransaction,saveCategory:saveCategory,
+    getAppData:getAppData,getAppDataJson:getAppDataJson,saveTransaction:saveTransaction,updateTransaction:updateTransaction,saveCategory:saveCategory,
     setCategoryActive:setCategoryActive,saveInvoice:saveInvoice,updateInvoiceStatus:updateInvoiceStatus,
     saveBudget:saveBudget,getAllocationPreview:getAllocationPreview,commitAllocation:commitAllocation,
     createAccountTransfer:createAccountTransfer,reconcileAccount:reconcileAccount,
@@ -76,6 +77,8 @@ function platformRpcDoPost_(payload){
   try{
     var args=Array.isArray(payload.args)?payload.args:[],cache=CacheService.getScriptCache(),cacheable=['getPlatformData','getInventoryWorkspace','getAppData','getAppDataJson','getDashboard','getBahanBaku','getProduk','getPreparations'],cacheKey='AIO_RPC_'+name;
     if(cacheable.indexOf(name)!==-1&&args.length===0){var cached=cache.get(cacheKey);if(cached!==null){try{return platformRpcResponse_({ok:true,data:JSON.parse(cached),cached:true});}catch(ignoreCache){cache.remove(cacheKey);}}}
+    var keyed=['verifyAdminLogin','getPlatformData','getInventoryWorkspace','getInvoices','setInvoiceStatus','saveSupplierInvoiceWithStock','generatePayroll','savePayrollAdjustments','previewPayroll','getPayrollRunDetail','postPayroll','syncReceivingAndAttendance','refreshPayrollLive','saveBahan','deleteBahan','platformSaveProduk','platformDeleteProduk','saveRecipe','deleteRecipe','postStockMovement','updateStockMovement','getPayrollAdminData','savePayrollEmployee','deletePayrollEmployee','removePayrollEmployee','savePayrollAttendance','deletePayrollAttendance'];
+    if(keyed.indexOf(name)!==-1&&String(args[0]||'')!==String(payload.adminKey||''))args.unshift(String(payload.adminKey||''));
     var data=fn.apply(null,args);
     if(cacheable.indexOf(name)!==-1&&args.length===0)platformCachePutSafe_(cache,cacheKey,data,10);
     if(platformRpcIsMutation_(name))cache.removeAll(cacheable.map(function(item){return'AIO_RPC_'+item;}));
@@ -85,7 +88,7 @@ function platformRpcDoPost_(payload){
 }
 
 function platformRpcResponse_(value){return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);}
-function platformRpcIsMutation_(name){return['setInvoiceStatus','generatePayroll','savePayrollAdjustments','postPayroll','syncReceivingAndAttendance','saveBahan','deleteBahan','platformSaveProduk','platformDeleteProduk','saveRecipe','deleteRecipe','postStockMovement','savePayrollEmployee','deletePayrollEmployee','savePayrollAttendance','deletePayrollAttendance','saveTransaction','saveCategory','setCategoryActive','saveInvoice','updateInvoiceStatus','saveBudget','commitAllocation','createAccountTransfer','reconcileAccount','saveAllocationRule','setCategoryAccount','saveBahanBaku','deleteBahanBaku','saveProduk','deleteProduk','savePreparation','deletePreparation'].indexOf(name)!==-1;}
+function platformRpcIsMutation_(name){return['setInvoiceStatus','saveSupplierInvoiceWithStock','generatePayroll','savePayrollAdjustments','postPayroll','syncReceivingAndAttendance','saveBahan','deleteBahan','platformSaveProduk','platformDeleteProduk','saveRecipe','deleteRecipe','postStockMovement','updateStockMovement','savePayrollEmployee','deletePayrollEmployee','removePayrollEmployee','savePayrollAttendance','deletePayrollAttendance','saveTransaction','updateTransaction','saveCategory','setCategoryActive','saveInvoice','updateInvoiceStatus','saveBudget','commitAllocation','createAccountTransfer','reconcileAccount','saveAllocationRule','setCategoryAccount','saveBahanBaku','deleteBahanBaku','saveProduk','deleteProduk','savePreparation','deletePreparation'].indexOf(name)!==-1;}
 function platformCachePutSafe_(cache,key,value,seconds){try{var json=JSON.stringify(value);if(json.length<90000)cache.put(key,json,seconds);}catch(e){Logger.log('Cache dilewati '+key+': '+e.message);}}
 function stockModuleRequest(request){request=request||{};var user=cekKodeAkses_(request.kodeAkses);if(!user)return{sukses:false,pesan:'Kode akses tidak valid'};var action=String(request.action||''),cache=CacheService.getScriptCache(),cacheKey='AIO_STOCK_'+action+'_'+String(request.bahanId||'')+'_'+String(request.bulan||'')+'_'+String(request.tahun||''),reads=['getBahan','getHistoryMasuk','getHistoryKeluar','getLaporanBulanan'];if(reads.indexOf(action)!==-1){var cached=cache.get(cacheKey);if(cached!==null){try{return JSON.parse(cached);}catch(ignoreCache){cache.remove(cacheKey);}}var readResult=action==='getBahan'?actionGetBahan_():action==='getHistoryMasuk'?actionGetHistoryMasuk_(request.bahanId):action==='getHistoryKeluar'?actionGetHistoryKeluar_(request.bahanId):actionGetLaporanBulanan_(Number(request.bulan),Number(request.tahun));platformCachePutSafe_(cache,cacheKey,readResult,10);return readResult;}var result;if(action==='inputStokMasuk')result=actionInputStokMasuk_(request,user.nama);else if(action==='inputStokKeluar')result=actionInputStokKeluar_(request,user.nama);else if(action==='syncFromHPP')result=actionSyncFromHPP_(user.nama);else return{sukses:false,pesan:'Action tidak dikenal: '+action};cache.removeAll(['AIO_STOCK_getBahan___','AIO_STOCK_getHistoryMasuk_'+String(request.bahanId)+'__','AIO_STOCK_getHistoryKeluar_'+String(request.bahanId)+'__']);return result;}
 
@@ -168,7 +171,101 @@ function saveRecipe(key,data){platformAuth_(key);data=data||{};var ss=platformSS
 function deleteRecipe(key,id){platformAuth_(key);var ss=platformSS_(),sh=ss.getSheetByName(PLATFORM.RESEP),row=platformFindRow_(sh,id);if(!row)throw new Error('Resep tidak ditemukan');var productId=String(sh.getRange(row,2).getValue());sh.deleteRow(row);platformRecalculateProduct_(ss,productId);platformAudit_(ss,'HPP','HAPUS_RESEP',id,productId);return{ok:true};}
 
 // ---------- STOCK ----------
-function postStockMovement(key,data){platformAuth_(key);data=data||{};var ss=platformSS_(),id=String(data.materialId||''),type=String(data.type||''),qty=platformNum_(data.qty),price=platformNum_(data.price);if(!id||['MASUK','KELUAR','ADJUSTMENT'].indexOf(type)<0||qty<=0)throw new Error('Data pergerakan stok tidak valid');var lock=LockService.getScriptLock();lock.waitLock(20000);try{platformEnsureStockRow_(ss,id);var sh=ss.getSheetByName(PLATFORM.STOCK),row=platformFindRow_(sh,id),r=sh.getRange(row,1,1,4).getValues()[0],oldQty=platformNum_(r[1]),oldAvg=platformNum_(r[2]),newQty=oldQty,newAvg=oldAvg;if(type==='MASUK'){newQty=oldQty+qty;newAvg=newQty?((oldQty*oldAvg)+(qty*price))/newQty:price;}else if(type==='KELUAR'){if(qty>oldQty)throw new Error('Stok tidak cukup');newQty=oldQty-qty;price=oldAvg;}else{newQty=qty;price=oldAvg;}sh.getRange(row,2,1,3).setValues([[newQty,newAvg,new Date()]]);ss.getSheetByName(PLATFORM.MOVEMENT).appendRow(['STK-'+Utilities.getUuid(),new Date(),platformDate_(data.date)||platformDate_(new Date()),id,type,qty,price,qty*price,String(data.category||''),String(data.note||''),'Admin']);platformAudit_(ss,'STOCK',type,id,'Qty '+qty);return{ok:true,stock:newQty,average:newAvg};}finally{lock.releaseLock();}}
+function postStockMovement(key,data){
+  platformAuth_(key);data=data||{};
+  var ss=platformSS_(),id=String(data.materialId||''),type=String(data.type||''),qty=platformNum_(data.qty),price=platformNum_(data.price);
+  if(!id||['MASUK','KELUAR','ADJUSTMENT'].indexOf(type)<0||qty<=0)throw new Error('Data pergerakan stok tidak valid');
+  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  try{
+    platformEnsureStockRow_(ss,id);
+    var sh=ss.getSheetByName(PLATFORM.STOCK),row=platformFindRow_(sh,id),r=sh.getRange(row,1,1,4).getValues()[0],oldQty=platformNum_(r[1]),oldAvg=platformNum_(r[2]),newQty=oldQty,newAvg=oldAvg;
+    var requestedMovementId=String(data.movementId||'');
+    if(requestedMovementId&&platformFindRow_(ss.getSheetByName(PLATFORM.MOVEMENT),requestedMovementId))return{ok:true,id:requestedMovementId,stock:oldQty,average:oldAvg,already:true};
+    if(type==='MASUK'){
+      if(price<=0)throw new Error('Harga stok masuk harus lebih dari 0');
+      newQty=oldQty+qty;newAvg=newQty?((oldQty*oldAvg)+(qty*price))/newQty:price;
+    }else if(type==='KELUAR'){
+      if(qty>oldQty)throw new Error('Stok tidak cukup');newQty=oldQty-qty;price=oldAvg;
+    }else{newQty=qty;price=oldAvg;}
+    sh.getRange(row,2,1,3).setValues([[newQty,newAvg,new Date()]]);
+    var movementId=requestedMovementId||'STK-'+Utilities.getUuid();
+    ss.getSheetByName(PLATFORM.MOVEMENT).appendRow([movementId,new Date(),platformParseIsoDate_(platformDate_(data.date)||platformDate_(new Date())),id,type,qty,price,qty*price,String(data.category||''),String(data.note||''),'Admin']);
+    if(type==='MASUK'&&Math.abs(newAvg-oldAvg)>0.000001)platformRefreshMaterialCost_(ss,id,newAvg);
+    platformAudit_(ss,'STOCK',type,id,'Qty '+qty);
+    return{ok:true,id:movementId,stock:newQty,average:newAvg};
+  }finally{lock.releaseLock();}
+}
+
+/** Edit hanya movement modern. Bahan dan tipe dikunci agar histori antarsheet tidak terputus. */
+function updateStockMovement(key,data){
+  platformAuth_(key);data=data||{};
+  var ss=platformSS_(),movement=ss.getSheetByName(PLATFORM.MOVEMENT),movementId=String(data.id||''),row=platformFindRow_(movement,movementId);
+  if(!row||movementId.indexOf('LEGACY-')===0)throw new Error('Movement lama tidak dapat diedit dari platform');
+  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  try{
+    var old=movement.getRange(row,1,1,11).getValues()[0],materialId=String(old[3]),type=String(old[4]),oldQty=platformNum_(old[5]),oldPrice=platformNum_(old[6]);
+    var qty=platformNum_(data.qty),price=type==='MASUK'?platformNum_(data.price):oldPrice;
+    if(qty<=0||(type==='MASUK'&&price<=0))throw new Error('Jumlah dan harga movement harus valid');
+    platformEnsureStockRow_(ss,materialId);
+    var balance=ss.getSheetByName(PLATFORM.STOCK),balanceRow=platformFindRow_(balance,materialId),current=balance.getRange(balanceRow,1,1,4).getValues()[0],currentQty=platformNum_(current[1]),currentAvg=platformNum_(current[2]),newQty=currentQty,newAvg=currentAvg;
+    if(type==='MASUK'){
+      newQty=currentQty-oldQty+qty;
+      if(newQty<0)throw new Error('Movement tidak dapat diedit karena stok sudah lebih kecil dari jumlah lama');
+      var newValue=(currentQty*currentAvg)-(oldQty*oldPrice)+(qty*price);
+      newAvg=newQty>0?Math.max(0,newValue/newQty):0;
+    }else if(type==='KELUAR'){
+      newQty=currentQty+oldQty-qty;
+      if(newQty<0)throw new Error('Jumlah stok keluar melebihi stok tersedia');
+      price=oldPrice;
+    }else throw new Error('Movement adjustment tidak dapat diedit');
+    balance.getRange(balanceRow,2,1,3).setValues([[newQty,newAvg,new Date()]]);
+    movement.getRange(row,3,1,7).setValues([[platformParseIsoDate_(platformDate_(data.date)||platformDate_(old[2])),materialId,type,qty,price,qty*price,String(data.category||old[8]||'')]]);
+    movement.getRange(row,10).setValue(String(data.note||''));
+    if(type==='MASUK'&&Math.abs(newAvg-currentAvg)>0.000001)platformRefreshMaterialCost_(ss,materialId,newAvg);
+    platformAudit_(ss,'STOCK','EDIT_MOVEMENT',movementId,'Qty '+oldQty+' menjadi '+qty);
+    return{ok:true,id:movementId,stock:newQty,average:newAvg};
+  }finally{lock.releaseLock();}
+}
+
+/** Sinkronkan harga rata-rata ke master bahan, resep, dan total HPP produk. */
+function platformRefreshMaterialCost_(ss,materialId,price){
+  var bahan=ss.getSheetByName('BAHAN_BAKU'),bahanRow=platformFindRow_(bahan,materialId);
+  if(bahanRow)bahan.getRange(bahanRow,4,1,3).setValues([[price,bahan.getRange(bahanRow,5).getValue(),new Date()]]);
+  var affected={};
+  var modern=ss.getSheetByName(PLATFORM.RESEP);
+  platformRows_(modern,7).forEach(function(r,index){if(String(r[2])!==String(materialId))return;modern.getRange(index+2,6,1,2).setValues([[price,platformNum_(r[3])*price]]);affected[String(r[1])]=true;});
+  Object.keys(affected).forEach(function(productId){platformRecalculateProduct_(ss,productId);});
+  var exact=ss.getSheetByName('RESEP'),exactAffected={};
+  platformRows_(exact,9).forEach(function(r,index){if(String(r[3])!==String(materialId))return;exact.getRange(index+2,8,1,2).setValues([[price,platformNum_(r[6])*price]]);exactAffected[String(r[1])]=true;});
+  var products=ss.getSheetByName('PRODUK');
+  Object.keys(exactAffected).forEach(function(productId){
+    var productRow=platformFindRow_(products,productId);if(!productRow)return;
+    var rowValues=products.getRange(productRow,1,1,11).getValues()[0],base=platformRows_(exact,9).filter(function(r){return String(r[1])===productId;}).reduce(function(sum,r){return sum+platformNum_(r[8]);},0),selling=platformNum_(rowValues[3]),overheadPct=platformNum_(rowValues[5]),overhead=base*overheadPct/100,total=base+overhead,marginNominal=selling-total,marginPct=selling>0?marginNominal/selling*100:0;
+    products.getRange(productRow,5,1,6).setValues([[base,overheadPct,overhead,total,Math.round(marginPct*10)/10,marginNominal]]);
+  });
+}
+
+/** Simpan invoice dan stoknya dengan marker idempotent agar retry tidak menggandakan stok. */
+function saveSupplierInvoiceWithStock(key,payload){
+  platformAuth_(key);payload=payload||{};
+  var ss=platformSS_(),invoiceId=String(payload.id||'')||'INV-'+Utilities.getUuid(),items=Array.isArray(payload.items)?payload.items:[];
+  if(!items.length)throw new Error('Invoice harus memiliki minimal satu item');
+  items.forEach(function(item){if(!item.materialId||platformNum_(item.qty)<=0||platformNum_(item.price)<=0)throw new Error('Material, jumlah, dan harga invoice wajib valid');if(!platformFindRow_(ss.getSheetByName(PLATFORM.BAHAN),item.materialId))throw new Error('Material invoice tidak ditemukan: '+item.materialId);});
+  payload.id=invoiceId;
+  var invoiceSheet=ss.getSheetByName('Invoice'),invoiceRow=platformFindRow_(invoiceSheet,invoiceId);
+  if(!invoiceRow)saveInvoice(payload);
+  var movement=ss.getSheetByName(PLATFORM.MOVEMENT),existing={};
+  platformRows_(movement,11).forEach(function(r){existing[String(r[9]||'')]=true;});
+  var results=[];
+  items.forEach(function(item,index){
+    var marker='INVOICE_STOCK:'+invoiceId+':'+index;
+    if(existing[marker]){results.push({skipped:true,marker:marker});return;}
+    results.push(postStockMovement(key,{movementId:'STK-INV-'+invoiceId+'-'+index,materialId:String(item.materialId),type:'MASUK',qty:platformNum_(item.qty),price:platformNum_(item.price),date:payload.invoiceDate,category:'Pembelian Supplier',note:marker}));
+    existing[marker]=true;
+  });
+  platformAudit_(ss,'FINANCE','INVOICE_DAN_STOK',invoiceId,'Item '+items.length);
+  return{ok:true,id:invoiceId,stockMovements:results};
+}
 function deleteStockItem(key,id){return deleteBahan(key,id);}
 
 // ---------- FINANCE / INVOICE ----------
@@ -179,6 +276,7 @@ function setInvoiceStatus(key,id,status){platformAuth_(key);if(['Draft','Terkiri
 function getPayrollAdminData(key){platformAuth_(key);return platformSafe_(platformGetPayrollAdmin_(platformSS_()));}
 function savePayrollEmployee(key,data){platformAuth_(key);data=data||{};var ss=platformSS_(),sh=ss.getSheetByName('Karyawan'),id=String(data.id||'')||'EMP-'+Utilities.getUuid(),row=platformFindRow_(sh,id),name=String(data.name||'').trim(),type=String(data.type||'Fulltime'),rate=platformNum_(data.rate);if(!name||['Fulltime','Parttime'].indexOf(type)<0||rate<=0)throw new Error('Nama, tipe, dan rate karyawan wajib valid');var values=[id,name,type,rate,String(data.status||'Aktif'),platformParseIsoDate_(platformDate_(data.startDate)||platformDate_(new Date()))];if(row)sh.getRange(row,1,1,6).setValues([values]);else sh.appendRow(values);platformAudit_(ss,'PAYROLL',row?'EDIT_KARYAWAN':'TAMBAH_KARYAWAN',id,name);return{ok:true,id:id};}
 function deletePayrollEmployee(key,id){platformAuth_(key);var ss=platformSS_(),sh=ss.getSheetByName('Karyawan'),row=platformFindRow_(sh,id);if(!row)throw new Error('Karyawan tidak ditemukan');sh.getRange(row,5).setValue('Nonaktif');platformAudit_(ss,'PAYROLL','NONAKTIF_KARYAWAN',id,'');return{ok:true};}
+function removePayrollEmployee(key,id){platformAuth_(key);var ss=platformSS_(),sh=ss.getSheetByName('Karyawan'),row=platformFindRow_(sh,id);if(!row)throw new Error('Karyawan tidak ditemukan');var hasAttendance=platformRows_(ss.getSheetByName('Absensi'),11).some(function(r){return String(r[1])===String(id)}),hasPayroll=platformRows_(ss.getSheetByName(PLATFORM.PAY_DETAIL),12).some(function(r){return String(r[1])===String(id)});if(hasAttendance||hasPayroll){sh.getRange(row,5).setValue('Nonaktif');platformAudit_(ss,'PAYROLL','ARSIP_KARYAWAN',id,'Memiliki absensi/payroll');return{ok:true,archived:true};}sh.deleteRow(row);platformAudit_(ss,'PAYROLL','HAPUS_KARYAWAN',id,'Tanpa histori');return{ok:true,archived:false};}
 function savePayrollAttendance(key,data){platformAuth_(key);data=data||{};var ss=platformSS_(),sh=ss.getSheetByName('Absensi'),id=String(data.id||'')||'ATT-'+Utilities.getUuid(),row=platformFindRow_(sh,id),employeeId=String(data.employeeId||''),date=platformDate_(data.date),status=String(data.status||'Hadir');if(!employeeId||!date||['Hadir','Izin','Sakit','Alpha'].indexOf(status)<0)throw new Error('Karyawan, tanggal, dan status absensi wajib valid');var values=[id,employeeId,platformParseIsoDate_(date),String(data.inTime||''),String(data.outTime||''),platformNum_(data.hours),status,String(data.note||''),new Date(),platformNum_(data.overtimeHours),platformNum_(data.overtimeRate)];if(row)sh.getRange(row,1,1,11).setValues([values]);else sh.appendRow(values);platformAudit_(ss,'PAYROLL',row?'EDIT_ABSENSI':'TAMBAH_ABSENSI',id,status);return{ok:true,id:id};}
 function deletePayrollAttendance(key,id){platformAuth_(key);var ss=platformSS_(),sh=ss.getSheetByName('Absensi'),row=platformFindRow_(sh,id);if(!row)throw new Error('Absensi tidak ditemukan');sh.deleteRow(row);platformAudit_(ss,'PAYROLL','HAPUS_ABSENSI',id,'');return{ok:true};}
 function generatePayroll(key,req){platformAuth_(key);req=req||{};var ss=platformSS_(),scheme=String(req.scheme||'Fulltime'),period=platformPayrollPeriod_(scheme,req),runId='PAY-'+Utilities.getUuid(),calculated=platformCalculatePayroll_(ss,scheme,period,runId,{});ss.getSheetByName(PLATFORM.PAY_RUN).appendRow([runId,scheme,period.start,period.end,'DRAFT',calculated.total,'','',new Date(),'']);if(calculated.details.length)ss.getSheetByName(PLATFORM.PAY_DETAIL).getRange(ss.getSheetByName(PLATFORM.PAY_DETAIL).getLastRow()+1,1,calculated.details.length,12).setValues(calculated.details);return platformSafe_({runId:runId,scheme:scheme,start:period.start,end:period.end,status:'DRAFT',total:calculated.total,details:calculated.details});}

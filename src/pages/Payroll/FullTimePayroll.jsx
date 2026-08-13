@@ -5,7 +5,7 @@ import { Calculator, CheckCircle } from 'lucide-react';
 import Modal from '../../components/Modal';
 
 const FullTimePayroll = () => {
-  const employees = useStore(state => state.employees.filter(e => e.type === 'Full-time'));
+  const employees = useStore(state => state.employees.filter(e => e.type === 'Full-time' && String(e.status).toLowerCase() === 'aktif'));
   const attendanceData = useStore(state => state.attendanceData);
   const syncAttendance = useStore(state => state.syncAttendance);
   const savePayroll = useStore(state => state.savePayroll);
@@ -13,23 +13,34 @@ const FullTimePayroll = () => {
   const payrollHistory = useStore(state => state.payrollHistory);
   const loadPayroll = useStore(state => state.loadPayroll);
 
-  const [period, setPeriod] = useState('20 July - 19 August 2026');
-  const [calculatedPayroll, setCalculatedPayroll] = useState(null);
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [calculatedPayroll, setCalculatedPayroll] = useState([]);
+  const [loadingPayroll, setLoadingPayroll] = useState(true);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  useEffect(() => { if (!employees.length) loadPayroll().catch(() => {}); }, [employees.length, loadPayroll]);
+  const applyPreview = result => setCalculatedPayroll(result.employeesData.map(employee => ({ ...employee, baseSalary: employee.rate, actualDays: employee.present, expectedDays: employee.present + employee.leave + employee.sick + employee.absent, basePay: employee.totalPay - employee.overtime - employee.adjustment })));
+
+  useEffect(() => {
+    let active = true;
+    setLoadingPayroll(true);
+    Promise.all([loadPayroll(), previewPayroll({ scheme: 'Fulltime', month })])
+      .then(([, result]) => { if (active) applyPreview(result); })
+      .catch(error => { if (active) useStore.getState().addToast(error.message, 'error'); })
+      .finally(() => { if (active) setLoadingPayroll(false); });
+    return () => { active = false; };
+  }, []); // tarik sekali setiap halaman dibuka
 
   const handleCalculate = async () => {
-    const month = period.includes('August 2026') ? '2026-08' : '2026-07';
+    setLoadingPayroll(true);
     try {
       const result = await previewPayroll({ scheme: 'Fulltime', month });
-      setCalculatedPayroll(result.employeesData.map(employee => ({ ...employee, baseSalary: employee.rate, actualDays: employee.present, expectedDays: employee.present + employee.leave + employee.sick + employee.absent, basePay: employee.totalPay - employee.overtime - employee.adjustment })));
+      applyPreview(result);
     } catch (error) { useStore.getState().addToast(error.message, 'error'); }
+    finally { setLoadingPayroll(false); }
   };
 
   const handleConfirm = () => {
-    const month = period.includes('August 2026') ? '2026-08' : '2026-07';
     savePayroll({
-      period,
+      period: month,
       type: 'Full-time',
       month
     }).then(result => {
@@ -50,7 +61,7 @@ const FullTimePayroll = () => {
         <h1 className="page-title" style={{ margin: 0 }}>Full-time Payroll</h1>
         <div className="flex gap-4 items-center">
           <div className="text-sm text-gray-500">
-            {attendanceData.length} data absensi dimuat
+            {employees.length} karyawan · {attendanceData.length} data absensi dimuat
           </div>
           <button className="btn btn-outline" onClick={syncAttendance}>
             Refresh Attendance
@@ -62,20 +73,16 @@ const FullTimePayroll = () => {
         <div className="flex gap-4 items-end">
           <div className="form-group mb-0" style={{ flex: 1 }}>
             <label className="form-label">Payroll Period</label>
-            <select className="form-control" value={period} onChange={e => setPeriod(e.target.value)}>
-              <option value="20 July - 19 August 2026">20 July - 19 August 2026</option>
-              <option value="20 June - 19 July 2026">20 June - 19 July 2026</option>
-            </select>
+            <input type="month" className="form-control" value={month} onChange={e => setMonth(e.target.value)} />
           </div>
-          <button className="btn btn-primary" onClick={handleCalculate}>
+          <button className="btn btn-primary" onClick={handleCalculate} disabled={loadingPayroll}>
             <Calculator size={16} className="mr-2" style={{ marginRight: '0.5rem' }} />
-            Calculate Payroll
+            {loadingPayroll ? 'Memuat…' : 'Calculate Payroll'}
           </button>
         </div>
       </div>
 
-      {calculatedPayroll && (
-        <div className="card animate-fade-in">
+      <div className="card animate-fade-in">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold">Calculation Results</h3>
             <button className="btn btn-success" style={{ backgroundColor: 'var(--color-success)', color: 'white' }} onClick={() => setIsConfirmModalOpen(true)}>
@@ -96,6 +103,7 @@ const FullTimePayroll = () => {
                 </tr>
               </thead>
               <tbody>
+                {!loadingPayroll && calculatedPayroll.length === 0 && <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Tidak ada karyawan Full-time aktif. Periksa Pengaturan → Data Karyawan.</td></tr>}
                 {calculatedPayroll.map(emp => (
                   <tr key={emp.id}>
                     <td className="font-medium">{emp.name}<div className="text-xs text-gray-500">{emp.role}</div></td>
@@ -110,7 +118,6 @@ const FullTimePayroll = () => {
             </table>
           </div>
         </div>
-      )}
 
       {payrollHistory.filter(p => p.type === 'Full-time').length > 0 && (
         <div className="card mt-6">

@@ -27,6 +27,7 @@ const Attendance = React.lazy(() => import('./pages/Payroll/Attendance'));
 const FullTimePayroll = React.lazy(() => import('./pages/Payroll/FullTimePayroll'));
 const PartTimePayroll = React.lazy(() => import('./pages/Payroll/PartTimePayroll'));
 const PayrollHistory = React.lazy(() => import('./pages/Payroll/PayrollHistory'));
+const EmployeeSettings = React.lazy(() => import('./pages/Settings/EmployeeSettings'));
 
 const Placeholder = ({ title }) => (
   <div className="page-container">
@@ -118,7 +119,7 @@ function App() {
           <Route path="payroll-part" element={<PartTimePayroll />} />
           <Route path="payroll-history" element={<PayrollHistory />} />
 
-          <Route path="settings" element={<Placeholder title="Settings" />} />
+          <Route path="settings" element={<EmployeeSettings />} />
           <Route path="profile" element={<Placeholder title="User Profile" />} />
         </Route>
       </Routes></Suspense>

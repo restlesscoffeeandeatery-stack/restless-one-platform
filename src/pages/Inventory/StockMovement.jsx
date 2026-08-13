@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Pencil } from 'lucide-react';
 import Modal from '../../components/Modal';
 
 const STOCK_OUT_CATEGORIES = ['Production / Usage', 'Waste / Damaged', 'Complimentary', 'Stock Adjustment', 'Others'];
@@ -10,10 +10,12 @@ const StockMovement = () => {
   const stockHistory = useStore(s => s.stockHistory);
   const stockOut = useStore(s => s.stockOut);
   const stockIn = useStore(s => s.stockIn);
+  const updateStockMovement = useStore(s => s.updateStockMovement);
   const suppliers = useStore(s => s.suppliers);
 
   const [isStockInOpen, setIsStockInOpen] = useState(false);
   const [isStockOutOpen, setIsStockOutOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
 
   const [inForm, setInForm] = useState({ materialId: '', quantity: '', price: '', date: new Date().toISOString().split('T')[0], supplierId: '', notes: '' });
   const [outForm, setOutForm] = useState({ materialId: '', quantity: '', category: '', date: new Date().toISOString().split('T')[0], notes: '', reason: '' });
@@ -31,6 +33,16 @@ const StockMovement = () => {
     await stockOut(outForm.materialId, Number(outForm.quantity), outForm.category, outForm.date, notes);
     setIsStockOutOpen(false);
     setOutForm({ materialId: '', quantity: '', category: '', date: new Date().toISOString().split('T')[0], notes: '', reason: '' });
+  };
+
+  const openEdit = movement => setEditing({ id: movement.id, materialId: movement.materialId, type: movement.type,
+    quantity: movement.type === 'IN' ? movement.qtyIn : movement.qtyOut, price: movement.price || '',
+    date: movement.date, category: movement.category || '', notes: movement.reference || '' });
+
+  const handleEdit = async e => {
+    e.preventDefault();
+    await updateStockMovement(editing);
+    setEditing(null);
   };
 
   return (
@@ -60,11 +72,12 @@ const StockMovement = () => {
                 <th style={{ textAlign: 'right' }}>Qty In</th>
                 <th style={{ textAlign: 'right' }}>Qty Out</th>
                 <th style={{ textAlign: 'right' }}>Saldo</th>
+                <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {stockHistory.length === 0 && (
-                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-gray-400)' }}>Belum ada riwayat pergerakan stok.</td></tr>
+                <tr><td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-gray-400)' }}>Belum ada riwayat pergerakan stok.</td></tr>
               )}
               {stockHistory.map(h => {
                 const mat = materials.find(m => m.id === h.materialId);
@@ -80,6 +93,7 @@ const StockMovement = () => {
                     <td style={{ textAlign: 'right', color: 'var(--color-success)', fontWeight: 600 }}>{Number(h.qtyIn) > 0 ? `+${h.qtyIn}` : '-'}</td>
                     <td style={{ textAlign: 'right', color: 'var(--color-danger)', fontWeight: 600 }}>{Number(h.qtyOut) > 0 ? `-${h.qtyOut}` : '-'}</td>
                     <td style={{ textAlign: 'right', fontWeight: 700 }}>{h.balance == null ? '—' : h.balance} {mat?.unit}</td>
+                    <td>{!h.id.startsWith('LEGACY-') && h.type !== 'ADJUSTMENT' ? <button type="button" className="btn btn-outline text-xs" onClick={() => openEdit(h)}><Pencil size={14} style={{ marginRight: 5 }}/>Edit</button> : <span className="text-xs text-gray-500">Riwayat</span>}</td>
                   </tr>
                 );
               })}
@@ -183,6 +197,25 @@ const StockMovement = () => {
             <button type="submit" className="btn btn-primary">Simpan Stock Out</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={Boolean(editing)} onClose={() => setEditing(null)} title="Edit Pergerakan Stok">
+        {editing && <form onSubmit={handleEdit}>
+          <div className="modal-body flex-col gap-4">
+            <div className="form-group"><label className="form-label">Material</label><input className="form-control" value={materials.find(m => m.id === editing.materialId)?.name || editing.materialId} disabled /></div>
+            <div className="flex gap-4">
+              <div className="form-group" style={{ flex: 1 }}><label className="form-label">Jumlah</label><input type="number" min="0.01" step="0.01" required className="form-control" value={editing.quantity} onChange={e => setEditing({ ...editing, quantity: e.target.value })}/></div>
+              {editing.type === 'IN' && <div className="form-group" style={{ flex: 1 }}><label className="form-label">Harga Beli</label><input type="number" min="1" required className="form-control" value={editing.price} onChange={e => setEditing({ ...editing, price: e.target.value })}/></div>}
+            </div>
+            <div className="flex gap-4">
+              <div className="form-group" style={{ flex: 1 }}><label className="form-label">Tanggal</label><input type="date" required className="form-control" value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })}/></div>
+              <div className="form-group" style={{ flex: 1 }}><label className="form-label">Kategori</label><input className="form-control" value={editing.category} onChange={e => setEditing({ ...editing, category: e.target.value })}/></div>
+            </div>
+            <div className="form-group"><label className="form-label">Catatan</label><input className="form-control" value={editing.notes} onChange={e => setEditing({ ...editing, notes: e.target.value })}/></div>
+            <p className="text-xs text-gray-500">Mengedit movement akan menghitung ulang saldo stok dan harga rata-rata bahan.</p>
+          </div>
+          <div className="modal-footer"><button type="button" className="btn btn-outline" onClick={() => setEditing(null)}>Batal</button><button type="submit" className="btn btn-primary">Simpan Perubahan</button></div>
+        </form>}
       </Modal>
     </div>
   );
