@@ -1111,29 +1111,13 @@ const _prog = {
     this._setVal(0);
     clearTimeout(this._timer);
 
-    // Simulasi progress bertahap:
-    // 0→40% cepat, 40→70% sedang, 70→88% lambat
-    const schedule = [
-      [40,  80,  5],   // [target, interval_ms, step]
-      [70,  180, 3],
-      [88,  350, 1],
-    ];
-    let si = 0;
     const tick = () => {
       if (this._done) return;
-      const [target, interval, step] = schedule[si];
-      this._cur = Math.min(this._cur + step, target);
+      this._cur += 15;
+      if (this._cur >= 95) this._cur = 95;
       this._setVal(this._cur);
-      if (this._cur >= target) {
-        si++;
-        if (si < schedule.length) {
-          this._timer = setInterval(tick, schedule[si][1]);
-          clearInterval(this._timer - 1);
-        }
-        return;
-      }
     };
-    this._timer = setInterval(tick, schedule[0][1]);
+    this._timer = setInterval(tick, 40);
   },
 
   update(pct, label) {
@@ -1150,21 +1134,11 @@ const _prog = {
     this._wrap.classList.add('prog-done');
     this._setVal(100);
     if (label) this._lbl.textContent = label;
-    this._pill.style.transition = 'opacity 0.4s';
-    setTimeout(() => {
-      this._pill.style.opacity = '0';
-      this._wrap.style.transition = 'opacity 0.5s';
-      this._wrap.style.opacity = '0';
-      setTimeout(() => {
-        this._wrap.style.display = 'none';
-        this._pill.style.display = 'none';
-        this._wrap.style.transition = '';
-        this._pill.style.transition = '';
-        this._pill.style.opacity = '1';
-        this._wrap.className = '';
-        this._setVal(0);
-      }, 500);
-    }, 500);
+    this._wrap.style.display = 'none';
+    this._pill.style.display = 'none';
+    this._pill.style.opacity = '1';
+    this._wrap.className = '';
+    this._setVal(0);
   },
 
   error(label) {
