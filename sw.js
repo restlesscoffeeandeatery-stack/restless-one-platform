@@ -1,11 +1,10 @@
-const CACHE_NAME = 'restless-one-platform-v3';
+const CACHE_NAME = 'restless-one-platform-v4';
 const APP_SHELL = [
   './',
   './index.html',
-  './finance.html',
-  './hpp.html',
-  './stock.html',
-  './manifest.json'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', event => {
