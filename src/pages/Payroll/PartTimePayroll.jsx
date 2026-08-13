@@ -17,16 +17,15 @@ const buildWeeks = () => {
 const WEEKS = buildWeeks();
 
 const PartTimePayroll = () => {
-  const employees = useStore(s => s.employees.filter(e => e.type === 'Part-time' && String(e.status).toLowerCase() === 'aktif'));
   const savePayroll = useStore(s => s.savePayroll);
   const previewPayroll = useStore(s => s.previewPayroll);
   const payrollHistory = useStore(s => s.payrollHistory);
-  const loadPayroll = useStore(s => s.loadPayroll);
 
   const [selectedWeek, setSelectedWeek] = useState(WEEKS[1]);
   const [attendance, setAttendance] = useState({});
   const [calculated, setCalculated] = useState(null);
   const [loadingPayroll, setLoadingPayroll] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const applyPreview = result => {
     setCalculated(result.employeesData.map(employee => ({ ...employee, dailyRate: employee.rate, days: employee.present })));
@@ -36,9 +35,9 @@ const PartTimePayroll = () => {
   useEffect(() => {
     let active = true;
     setLoadingPayroll(true);
-    Promise.all([loadPayroll(), previewPayroll({ scheme: 'Parttime', start: selectedWeek.start, end: selectedWeek.end })])
-      .then(([, result]) => { if (active) applyPreview(result); })
-      .catch(error => { if (active) useStore.getState().addToast(error.message, 'error'); })
+    previewPayroll({ scheme: 'Parttime', start: selectedWeek.start, end: selectedWeek.end })
+      .then(result => { if (active) { applyPreview(result); setLoadError(''); } })
+      .catch(error => { if (active) { setLoadError(error.message); useStore.getState().addToast(error.message, 'error'); } })
       .finally(() => { if (active) setLoadingPayroll(false); });
     return () => { active = false; };
   }, []); // tarik sekali setiap halaman dibuka
@@ -49,10 +48,11 @@ const PartTimePayroll = () => {
 
   const handleCalculate = async () => {
     setLoadingPayroll(true);
+    setLoadError('');
     try {
       const result = await previewPayroll({ scheme: 'Parttime', start: selectedWeek.start, end: selectedWeek.end });
       applyPreview(result);
-    } catch (error) { useStore.getState().addToast(error.message, 'error'); }
+    } catch (error) { setLoadError(error.message); useStore.getState().addToast(error.message, 'error'); }
     finally { setLoadingPayroll(false); }
   };
 
@@ -97,11 +97,13 @@ const PartTimePayroll = () => {
             <tr><th>Karyawan</th><th>Jabatan</th><th>Rate Harian</th><th>Hari Hadir</th></tr>
           </thead>
           <tbody>
-            {!loadingPayroll && employees.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>Tidak ada karyawan Part-time aktif. Periksa Pengaturan → Data Karyawan.</td></tr>}
-            {employees.map(emp => (
+            {loadingPayroll && <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>Menarik data karyawan Part-time dan absensi…</td></tr>}
+            {loadError && !loadingPayroll && <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}><strong>Payroll gagal dimuat.</strong><div className="text-sm text-gray-500 mt-1">{loadError}</div><button type="button" className="btn btn-outline mt-4" onClick={handleCalculate}>Coba Lagi</button></td></tr>}
+            {!loadingPayroll && !loadError && calculated?.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem' }}>Tidak ada karyawan Part-time aktif. Periksa Pengaturan → Data Karyawan.</td></tr>}
+            {(calculated || []).map(emp => (
               <tr key={emp.id}>
                 <td className="font-medium">{emp.name}</td>
-                <td className="text-gray-500">{emp.role}</td>
+                <td className="text-gray-500">Part-time</td>
                 <td>{formatRupiah(emp.dailyRate)}</td>
                 <td>
                   <input type="number" className="form-control" style={{ width: 80 }} min={0} max={selectedWeek.days}
@@ -118,7 +120,7 @@ const PartTimePayroll = () => {
         <div className="card">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold">Hasil Kalkulasi</h3>
-            <button className="btn" style={{ backgroundColor: 'var(--color-success)', color: 'white' }} onClick={() => setIsConfirmOpen(true)}>
+            <button className="btn" disabled={!calculated.length} style={{ backgroundColor: 'var(--color-success)', color: 'white' }} onClick={() => setIsConfirmOpen(true)}>
               <CheckCircle size={16} style={{ marginRight: 6 }} /> Review & Konfirmasi
             </button>
           </div>

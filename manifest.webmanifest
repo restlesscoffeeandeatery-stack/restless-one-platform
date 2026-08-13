@@ -1,16 +1,16 @@
 {
   "name": "Restless One Platform",
   "short_name": "Restless",
-  "start_url": "./",
-  "scope": "./",
-  "id": "restless-one-platform",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
   "orientation": "any",
   "description": "Platform admin Restless untuk keuangan, inventory, HPP, invoice, absensi, dan payroll.",
   "background_color": "#f4f7f3",
   "theme_color": "#397557",
   "icons": [
-    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }

@@ -40,7 +40,8 @@ const Layout = () => {
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-  const canShowInstall = !isStandalone && (installReady || isIos);
+  const isAndroid = /android/i.test(window.navigator.userAgent);
+  const canShowInstall = !isStandalone && (installReady || isIos || isAndroid);
   const installApp = async () => {
     const prompt = window.__restlessInstallPrompt;
     if (!prompt) { setShowInstallGuide(true); return; }
@@ -75,9 +76,8 @@ const Layout = () => {
       <section className="pwa-guide" role="dialog" aria-modal="true" aria-labelledby="pwa-guide-title" onMouseDown={event => event.stopPropagation()}>
         <button type="button" className="icon-btn pwa-guide-close" aria-label="Tutup petunjuk install" onClick={() => setShowInstallGuide(false)}><X size={20}/></button>
         <div className="pwa-guide-icon"><Download size={24}/></div>
-        <h2 id="pwa-guide-title">Install di iPhone/iPad</h2>
-        <p>Buka platform menggunakan Safari, lalu:</p>
-        <ol><li>Tekan tombol <strong>Share</strong> <Share size={16}/></li><li>Pilih <strong>Add to Home Screen</strong>.</li><li>Tekan <strong>Add</strong>.</li></ol>
+        <h2 id="pwa-guide-title">Install Restless</h2>
+        {isAndroid ? <><p>Buka platform menggunakan Chrome, lalu:</p><ol><li>Tekan menu <strong>⋮</strong> di kanan atas.</li><li>Pilih <strong>Install app</strong> atau <strong>Add to Home screen</strong>.</li><li>Tekan <strong>Install</strong>.</li></ol></> : <><p>Buka platform menggunakan Safari, lalu:</p><ol><li>Tekan tombol <strong>Share</strong> <Share size={16}/></li><li>Pilih <strong>Add to Home Screen</strong>.</li><li>Tekan <strong>Add</strong>.</li></ol></>}
       </section>
     </div>}
   </div>;
