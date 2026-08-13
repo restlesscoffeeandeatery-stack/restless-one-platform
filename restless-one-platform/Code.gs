@@ -160,7 +160,7 @@ function getInventoryWorkspace(key) {
 }
 
 /** Verifikasi ringan tanpa membuka spreadsheet, agar respons login terasa instan. */
-function verifyAdminLogin(key){platformAuth_(key);return{ok:true,verifiedAt:platformDateTime_(new Date())};}
+function verifyAdminLogin(key){var user=platformAuthProfile_(key);return{ok:true,user:user,verifiedAt:platformDateTime_(new Date())};}
 
 // ---------- HPP ----------
 function saveBahan(key,data){platformAuth_(key);data=data||{};var ss=platformSS_(),sh=ss.getSheetByName(PLATFORM.BAHAN);var lock=LockService.getScriptLock();lock.waitLock(20000);try{var id=String(data.id||''),row=id?platformFindRow_(sh,id):0,name=String(data.name||'').trim(),unit=String(data.unit||''),category=String(data.category||''),price=platformNum_(data.price);if(!name)throw new Error('Nama bahan wajib diisi');if(!id)id='BHN-'+Utilities.getUuid();var values=[id,name,unit,category,data.active!==false,'Platform',new Date()];if(row)sh.getRange(row,1,1,7).setValues([values]);else sh.appendRow(values);platformEnsureStockRow_(ss,id);var stockSheet=ss.getSheetByName(PLATFORM.STOCK),stockRow=platformFindRow_(stockSheet,id);if(price>0)stockSheet.getRange(stockRow,3,1,2).setValues([[price,new Date()]]);var legacy=ss.getSheetByName('BAHAN_BAKU');if(legacy){var legacyRow=platformFindRow_(legacy,id),legacyValues=[id,name,unit,price,category,new Date()];if(legacyRow)legacy.getRange(legacyRow,1,1,6).setValues([legacyValues]);else legacy.appendRow(legacyValues);}platformAudit_(ss,'HPP',row?'EDIT_BAHAN':'TAMBAH_BAHAN',id,name);return{ok:true,id:id};}finally{lock.releaseLock();}}
@@ -298,23 +298,30 @@ function sinkronkanSemuaDataManual_(){var key=PropertiesService.getScriptPropert
 function sinkronkanSemuaDataManual(){platformRequireOwner_();return sinkronkanSemuaDataManual_();}
 
 /** Memeriksa seluruh Script Properties, akses spreadsheet, dan sheet wajib tanpa mengubah data. */
-function cekKonfigurasiRestlessPlatform(){platformRequireOwner_();var props=PropertiesService.getScriptProperties(),checks=[];checks.push(platformCheckSecret_(props,'PLATFORM_ADMIN_KEY',24));checks.push(platformCheckSpreadsheet_(props,'MASTER_SPREADSHEET_ID',[]));checks.push(platformCheckSpreadsheet_(props,'HPP_SOURCE_ID',['BAHAN_BAKU','PRODUK','RESEP']));checks.push(platformCheckSpreadsheet_(props,'STOCK_SOURCE_ID',['Bahan']));checks.push(platformCheckSpreadsheet_(props,'FINANCE_SOURCE_ID',['Transaksi','Kategori','Invoice','Rekening']));checks.push(platformCheckSpreadsheet_(props,'RECEIVING_SOURCE_ID',['Order','Penerimaan']));checks.push(platformCheckSpreadsheet_(props,'ATTENDANCE_SOURCE_ID',['Absensi_Log']));checks.push(platformCheckSpreadsheet_(props,'PAYROLL_SOURCE_ID',['Karyawan','Absensi']));['RECEIVING_APP_URL','ATTENDANCE_APP_URL'].forEach(function(name){checks.push(platformCheckUrl_(props,name));});var ok=checks.every(function(c){return c.ok});var result={ok:ok,checkedAt:platformDateTime_(new Date()),checks:checks,message:ok?'Semua konfigurasi valid.':'Ada konfigurasi yang perlu diperbaiki.'};Logger.log(JSON.stringify(result,null,2));return result;}
+function cekKonfigurasiRestlessPlatform(){platformRequireOwner_();var props=PropertiesService.getScriptProperties(),checks=[];checks.push(platformCheckSecret_(props,'PLATFORM_ADMIN_KEY',24));checks.push(platformCheckPin_(props,'PLATFORM_BOD_PIN'));checks.push(platformCheckSpreadsheet_(props,'MASTER_SPREADSHEET_ID',[]));checks.push(platformCheckSpreadsheet_(props,'HPP_SOURCE_ID',['BAHAN_BAKU','PRODUK','RESEP']));checks.push(platformCheckSpreadsheet_(props,'STOCK_SOURCE_ID',['Bahan']));checks.push(platformCheckSpreadsheet_(props,'FINANCE_SOURCE_ID',['Transaksi','Kategori','Invoice','Rekening']));checks.push(platformCheckSpreadsheet_(props,'RECEIVING_SOURCE_ID',['Order','Penerimaan']));checks.push(platformCheckSpreadsheet_(props,'ATTENDANCE_SOURCE_ID',['Absensi_Log']));checks.push(platformCheckSpreadsheet_(props,'PAYROLL_SOURCE_ID',['Karyawan','Absensi']));['RECEIVING_APP_URL','ATTENDANCE_APP_URL'].forEach(function(name){checks.push(platformCheckUrl_(props,name));});var ok=checks.every(function(c){return c.ok});var result={ok:ok,checkedAt:platformDateTime_(new Date()),checks:checks,message:ok?'Semua konfigurasi valid.':'Ada konfigurasi yang perlu diperbaiki.'};Logger.log(JSON.stringify(result,null,2));return result;}
 
 // ---------- HELPERS ----------
 function platformSS_(){var id=PropertiesService.getScriptProperties().getProperty('MASTER_SPREADSHEET_ID');if(!id)throw new Error('MASTER_SPREADSHEET_ID belum diisi');return SpreadsheetApp.openById(id);}
 function platformFinanceSS_(){return platformSS_();}
 function platformAuth_(key){
+  platformAuthProfile_(key);
+  return true;
+}
+function platformAuthProfile_(key){
   var props=PropertiesService.getScriptProperties();
   var adminKey=String(props.getProperty('PLATFORM_ADMIN_KEY')||'');
   var adminPin=String(props.getProperty('PLATFORM_ADMIN_PIN')||'');
+  var bodPin=String(props.getProperty('PLATFORM_BOD_PIN')||'');
   var credential=String(key||'');
-  if(adminKey&&platformSecureEqual_(credential,adminKey))return true;
-  if(/^\d{4}$/.test(adminPin)&&platformSecureEqual_(credential,adminPin))return true;
-  throw new Error(adminPin?'Akses ditolak':'PIN admin belum diatur di Script Properties');
+  if(adminKey&&platformSecureEqual_(credential,adminKey))return{name:'Rayhan',role:'Owner',initials:'RR'};
+  if(/^\d{4}$/.test(adminPin)&&platformSecureEqual_(credential,adminPin))return{name:'Rayhan',role:'Owner',initials:'RR'};
+  if(/^\d{4}$/.test(bodPin)&&platformSecureEqual_(credential,bodPin))return{name:'Iman',role:'BOD',initials:'IM'};
+  throw new Error(adminPin||bodPin?'Akses ditolak':'PIN pengguna belum diatur di Script Properties');
 }
 function platformSecureEqual_(a,b){a=String(a);b=String(b);if(a.length!==b.length)return false;var mismatch=0;for(var i=0;i<a.length;i++)mismatch|=a.charCodeAt(i)^b.charCodeAt(i);return mismatch===0;}
 function platformRequireOwner_(){var expected=String(PropertiesService.getScriptProperties().getProperty('PLATFORM_OWNER_EMAIL')||'').trim().toLowerCase(),actual=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();if(!expected)throw new Error('PLATFORM_OWNER_EMAIL belum diisi di Script Properties');if(!actual||actual!==expected)throw new Error('Fungsi manual hanya boleh dijalankan oleh '+expected);}
 function platformCheckSecret_(props,name,minLength){var value=String(props.getProperty(name)||'');return{name:name,ok:value.length>=minLength,message:value.length>=minLength?'Terisi dan panjangnya aman':'Wajib diisi minimal '+minLength+' karakter'};}
+function platformCheckPin_(props,name){var value=String(props.getProperty(name)||'');return{name:name,ok:/^\d{4}$/.test(value),message:/^\d{4}$/.test(value)?'PIN 4 digit terisi':'Wajib diisi tepat 4 digit'};}
 function platformCheckSpreadsheet_(props,name,requiredSheets){var id=String(props.getProperty(name)||'').trim();if(!id)return{name:name,ok:false,message:'Belum diisi'};try{var ss=SpreadsheetApp.openById(id),available=ss.getSheets().map(function(sh){return sh.getName()}),missing=requiredSheets.filter(function(sheetName){return available.indexOf(sheetName)===-1});return{name:name,ok:missing.length===0,message:missing.length?'Sheet tidak ditemukan: '+missing.join(', '):'OK · '+ss.getName()};}catch(e){return{name:name,ok:false,message:'Tidak dapat dibuka: '+e.message};}}
 function platformCheckUrl_(props,name){var value=String(props.getProperty(name)||'').trim(),ok=value.toLowerCase().indexOf('https:' + String.fromCharCode(47,47))===0;return{name:name,ok:ok,message:ok?'OK':'Belum diisi atau bukan URL https'};}
 function platformEnsureSheet_(ss,name,headers){var sh=ss.getSheetByName(name)||ss.insertSheet(name);if(sh.getLastRow()===0){sh.getRange(1,1,1,headers.length).setValues([headers]);sh.setFrozenRows(1);sh.getRange(1,1,1,headers.length).setBackground('#183B35').setFontColor('#fff').setFontWeight('bold');}return sh;}

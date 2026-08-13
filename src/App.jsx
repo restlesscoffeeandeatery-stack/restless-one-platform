@@ -66,10 +66,10 @@ const LoginScreen = () => {
       <div className="login-mark"><span>R</span></div>
       <p className="eyebrow">RESTLESS COFFEE & EATERY</p>
       <h1 id="login-title">One Platform</h1>
-      <p className="login-copy">Masukkan PIN admin pusat untuk membuka operasional bisnis.</p>
+      <p className="login-copy">Masukkan PIN akun Rayhan atau Iman untuk membuka operasional bisnis.</p>
       <div className="pin-dots" aria-label={`${pin.length} dari 4 digit terisi`}>{[0,1,2,3].map(i => <span key={i} className={i < pin.length ? 'filled' : ''} />)}</div>
       <div className="pin-grid">{['1','2','3','4','5','6','7','8','9'].map(n => <button key={n} type="button" onClick={() => press(n)} disabled={busy}>{n}</button>)}<span/><button type="button" onClick={() => press('0')} disabled={busy}>0</button><button type="button" aria-label="Hapus digit" onClick={() => setPin(v => v.slice(0,-1))} disabled={busy}><Delete size={20}/></button></div>
-      <div className={`login-message ${error ? 'error' : ''}`} role="status"><LockKeyhole size={15}/>{busy ? 'Memverifikasi PIN…' : error || 'PIN tersimpan aman di Apps Script Properties'}</div>
+      <div className={`login-message ${error ? 'error' : ''}`} role="status"><LockKeyhole size={15}/>{busy ? 'Memverifikasi akun…' : error || 'PIN akun tersimpan aman di Apps Script Properties'}</div>
     </section>
   </main>;
 };

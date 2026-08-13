@@ -3,9 +3,14 @@ import { create } from 'zustand';
 const WORKER_URL = 'https://restless-one-platform-api.rekap-keuangan.workers.dev';
 export const PIN_STORAGE_KEY = 'restless_platform_admin_pin_v3';
 export const AUTH_STORAGE_KEY = 'restless_platform_auth_ok_v3';
+export const USER_STORAGE_KEY = 'restless_platform_user_v1';
 const CACHE_KEY = 'restless_backoffice_state_v1';
 
 const getPin = () => localStorage.getItem(PIN_STORAGE_KEY) || '';
+const getStoredUser = () => {
+  try { return JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || 'null'); }
+  catch { return null; }
+};
 
 async function rpc(fn, ...args) {
   const pin = getPin();
@@ -92,6 +97,7 @@ const emptyState = {
 export const useStore = create((set, get) => ({
   ...emptyState,
   authenticated: localStorage.getItem(AUTH_STORAGE_KEY) === '1' && Boolean(getPin()),
+  currentUser: getStoredUser() || { name: 'Rayhan', role: 'Owner', initials: 'RR' },
   addToast: (message, type = 'success') => window.dispatchEvent(new CustomEvent('toast', { detail: { message, type } })),
 
   fetchState: async ({ silent = false } = {}) => {
@@ -120,10 +126,10 @@ export const useStore = create((set, get) => ({
 
   verifyPin: async pin => {
     localStorage.setItem(PIN_STORAGE_KEY, pin);
-    try { await rpc('verifyAdminLogin'); localStorage.setItem(AUTH_STORAGE_KEY, '1'); set({ authenticated: true }); return true; }
+    try { const result = await rpc('verifyAdminLogin'); const user = result.user || { name: 'Rayhan', role: 'Owner', initials: 'RR' }; localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user)); localStorage.setItem(AUTH_STORAGE_KEY, '1'); set({ authenticated: true, currentUser: user }); return user; }
     catch (error) { localStorage.removeItem(PIN_STORAGE_KEY); throw error; }
   },
-  logout: () => { localStorage.removeItem(AUTH_STORAGE_KEY); set({ ...emptyState, authenticated: false, loading: false }); },
+  logout: () => { localStorage.removeItem(AUTH_STORAGE_KEY); localStorage.removeItem(PIN_STORAGE_KEY); localStorage.removeItem(USER_STORAGE_KEY); set({ ...emptyState, authenticated: false, currentUser: null, loading: false }); },
 
   transferMoney: async (fromAccId, toAccId, amount, date, notes) => {
     await rpc('createAccountTransfer', { sourceAccount: fromAccId, destinationAccount: toAccId, amount: Number(amount), date, description: notes || 'Transfer antar rekening', note: notes || '' });

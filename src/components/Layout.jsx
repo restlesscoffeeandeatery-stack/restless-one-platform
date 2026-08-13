@@ -21,6 +21,7 @@ const Layout = () => {
   const logout = useStore(s => s.logout);
   const fetchState = useStore(s => s.fetchState);
   const refreshing = useStore(s => s.refreshing);
+  const currentUser = useStore(s => s.currentUser) || { name: 'Rayhan', role: 'Owner', initials: 'RR' };
 
   useEffect(() => {
     const handleToast = e => {
@@ -66,7 +67,7 @@ const Layout = () => {
           <label className="header-search"><Search size={17}/><input type="search" placeholder="Cari data…" aria-label="Cari data"/></label>
           <button className="icon-btn" title="Muat ulang data" aria-label="Muat ulang data" onClick={() => fetchState({ silent: true })}><RefreshCw size={19} className={refreshing ? 'spin' : ''}/></button>
           <button className="icon-btn notification-btn" title="Notifikasi" aria-label="Notifikasi"><Bell size={19}/><span/></button>
-          <button className="profile-menu" type="button" onClick={logout} title="Log out manager"><span className="user-avatar">IM</span><span className="profile-copy"><strong>Iman</strong><small>Manager</small></span><LogOut size={16}/></button>
+          <button className="profile-menu" type="button" onClick={logout} title={`Log out ${currentUser.name}`}><span className="user-avatar">{currentUser.initials}</span><span className="profile-copy"><strong>{currentUser.name}</strong><small>{currentUser.role}</small></span><LogOut size={16}/></button>
         </div>
       </header>
       <main className="workspace"><Outlet /></main>
