@@ -1,0 +1,1 @@
+var e=e=>new Intl.NumberFormat(`id-ID`,{style:`currency`,currency:`IDR`,minimumFractionDigits:0,maximumFractionDigits:0}).format(e),t=e=>`${Number(e).toFixed(1)}%`;export{e as n,t};
