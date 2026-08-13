@@ -201,14 +201,14 @@ export const useStore = create((set, get) => ({
     await rpc('syncReceivingAndAttendance', getPin());
     const live = await rpc('refreshPayrollLive', getPin(), '');
     const employees = (live.payrollAdmin?.employees || []).map(e => ({ id: e.id, name: e.name, type: e.type === 'Fulltime' ? 'Full-time' : 'Part-time', baseSalary: e.type === 'Fulltime' ? Number(e.rate) : 0, dailyRate: e.type === 'Parttime' ? Number(e.rate) : 0, status: e.status }));
-    const attendanceData = (live.payrollAdmin?.attendance || []).map(a => ({ id: a.id, employeeId: a.employeeId, date: a.date, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, overtimeHours: a.overtimeHours }));
+    const attendanceData = (live.payrollAdmin?.attendance || []).map(a => ({ id: a.id, employeeId: a.employeeId, date: a.date, inTime: a.inTime, outTime: a.outTime, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, note: a.note || '', overtimeHours: a.overtimeHours, overtimeRate: a.overtimeRate }));
     set({ employees, attendanceData }); get().addToast('Absensi dan payroll berhasil disinkronkan.');
   },
 
   loadPayroll: async () => {
     const live = await rpc('refreshPayrollLive', getPin(), '');
     const employees = (live.payrollAdmin?.employees || []).map(e => ({ id: e.id, name: e.name, type: e.type === 'Fulltime' ? 'Full-time' : 'Part-time', baseSalary: e.type === 'Fulltime' ? Number(e.rate) : 0, dailyRate: e.type === 'Parttime' ? Number(e.rate) : 0, status: e.status }));
-    const attendanceData = (live.payrollAdmin?.attendance || []).map(a => ({ id: a.id, employeeId: a.employeeId, date: a.date, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, overtimeHours: a.overtimeHours }));
+    const attendanceData = (live.payrollAdmin?.attendance || []).map(a => ({ id: a.id, employeeId: a.employeeId, date: a.date, inTime: a.inTime, outTime: a.outTime, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, note: a.note || '', overtimeHours: a.overtimeHours, overtimeRate: a.overtimeRate }));
     set({ employees, attendanceData }); return live;
   },
 
