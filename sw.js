@@ -1,4 +1,4 @@
-const CACHE_NAME = 'restless-one-platform-v6';
+const CACHE_NAME = 'restless-one-platform-v7';
 const APP_SHELL = [
   './',
   './index.html',
