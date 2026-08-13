@@ -7,15 +7,39 @@ import Modal from '../../components/Modal';
 const FullTimePayroll = () => {
   const syncAttendance = useStore(state => state.syncAttendance);
   const savePayroll = useStore(state => state.savePayroll);
+  const savePayrollAdjustments = useStore(state => state.savePayrollAdjustments);
   const previewPayroll = useStore(state => state.previewPayroll);
   const payrollHistory = useStore(state => state.payrollHistory);
 
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [calculatedPayroll, setCalculatedPayroll] = useState([]);
   const [loadingPayroll, setLoadingPayroll] = useState(true);
+  const [savingPayroll, setSavingPayroll] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const applyPreview = result => setCalculatedPayroll(result.employeesData.map(employee => ({ ...employee, baseSalary: employee.rate, actualDays: employee.present, expectedDays: employee.present + employee.leave + employee.sick + employee.absent, basePay: employee.totalPay - employee.overtime - employee.adjustment })));
+  const applyPreview = result => setCalculatedPayroll(result.employeesData.map(employee => ({
+    ...employee,
+    baseSalary: employee.rate,
+    actualDays: employee.present,
+    expectedDays: employee.present + employee.leave + employee.sick + employee.absent,
+    basePay: employee.totalPay - employee.overtime - employee.adjustment,
+    originalTotalPay: employee.totalPay,
+    originalAdjustment: employee.adjustment,
+    totalPayInput: String(employee.totalPay)
+  })));
+
+  const totalFee = calculatedPayroll.reduce((sum, employee) => sum + Number(employee.totalPay || 0), 0);
+
+  const updateTotalPay = (employeeId, rawValue) => {
+    const digits = rawValue.replace(/[^\d]/g, '');
+    const nextTotal = digits === '' ? 0 : Number(digits);
+    setCalculatedPayroll(current => current.map(employee => employee.id === employeeId ? {
+      ...employee,
+      totalPayInput: digits,
+      totalPay: nextTotal,
+      adjustment: Number(employee.originalAdjustment || 0) + nextTotal - Number(employee.originalTotalPay || 0)
+    } : employee));
+  };
 
   useEffect(() => {
     let active = true;
@@ -43,21 +67,28 @@ const FullTimePayroll = () => {
     catch (error) { setLoadError(error.message); useStore.getState().addToast(error.message, 'error'); setLoadingPayroll(false); }
   };
 
-  const handleConfirm = () => {
-    savePayroll({
-      period: month,
-      type: 'Full-time',
-      month
-    }).then(result => {
-      setCalculatedPayroll(result.employeesData.map(employee => ({
-        ...employee,
-        baseSalary: employee.rate,
-        actualDays: employee.present,
-        expectedDays: employee.present + employee.leave + employee.sick + employee.absent,
-        basePay: employee.totalPay - employee.overtime - employee.adjustment
-      })));
+  const handleConfirm = async () => {
+    const editedPayroll = calculatedPayroll;
+    setSavingPayroll(true);
+    try {
+      const result = await savePayroll({ period: month, type: 'Full-time', month });
+      const generatedById = Object.fromEntries(result.employeesData.map(employee => [employee.id, employee]));
+      const changes = editedPayroll.map(employee => {
+        const generated = generatedById[employee.id];
+        const generatedTotal = Number(generated?.totalPay || 0);
+        const generatedAdjustment = Number(generated?.adjustment || 0);
+        return {
+          employeeId: employee.id,
+          adjustment: generatedAdjustment + Number(employee.totalPay || 0) - generatedTotal,
+          note: employee.note || '',
+          changed: Number(employee.totalPay || 0) !== generatedTotal
+        };
+      }).filter(change => change.changed).map(change => ({ employeeId: change.employeeId, adjustment: change.adjustment, note: change.note }));
+      if (changes.length) await savePayrollAdjustments(result.id, changes);
       setIsConfirmModalOpen(false);
-    }).catch(error => useStore.getState().addToast(error.message, 'error'));
+      setCalculatedPayroll(editedPayroll.map(employee => ({ ...employee, originalTotalPay: employee.totalPay, originalAdjustment: employee.adjustment })));
+    } catch (error) { useStore.getState().addToast(error.message, 'error'); }
+    finally { setSavingPayroll(false); }
   };
 
   return (
@@ -88,12 +119,15 @@ const FullTimePayroll = () => {
       </div>
 
       <div className="card animate-fade-in">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-4" style={{ gap: '1rem', flexWrap: 'wrap' }}>
             <h3 className="font-semibold">Calculation Results</h3>
-            <button className="btn btn-success" disabled={!calculatedPayroll.length} style={{ backgroundColor: 'var(--color-success)', color: 'white' }} onClick={() => setIsConfirmModalOpen(true)}>
-              <CheckCircle size={16} className="mr-2" style={{ marginRight: '0.5rem' }} />
-              Review & Confirm
-            </button>
+            <div className="flex items-center gap-4" style={{ flexWrap: 'wrap' }}>
+              <div aria-live="polite"><span className="text-sm text-gray-500">Total Fee</span><div className="font-semibold text-primary" style={{ fontSize: '1.25rem' }}>{formatRupiah(totalFee)}</div></div>
+              <button className="btn btn-success" disabled={!calculatedPayroll.length} style={{ backgroundColor: 'var(--color-success)', color: 'white' }} onClick={() => setIsConfirmModalOpen(true)}>
+                <CheckCircle size={16} className="mr-2" style={{ marginRight: '0.5rem' }} />
+                Review & Confirm
+              </button>
+            </div>
           </div>
           <div className="table-wrapper">
             <table className="table">
@@ -118,7 +152,19 @@ const FullTimePayroll = () => {
                     <td>{emp.actualDays}/{emp.expectedDays} days</td>
                     <td>{formatRupiah(emp.basePay)}</td>
                     <td>{formatRupiah(emp.overtime)}</td>
-                    <td className="font-semibold text-primary">{formatRupiah(emp.totalPay)}</td>
+                    <td>
+                      <input
+                        id={`total-pay-${emp.id}`}
+                        aria-label={`Total Pay ${emp.name}`}
+                        type="text"
+                        inputMode="numeric"
+                        className="form-control font-semibold text-primary"
+                        style={{ minWidth: 150 }}
+                        value={emp.totalPayInput}
+                        onChange={event => updateTotalPay(emp.id, event.target.value)}
+                        onBlur={() => { if (emp.totalPayInput === '') updateTotalPay(emp.id, '0'); }}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -157,12 +203,12 @@ const FullTimePayroll = () => {
           <p className="mb-4 text-gray-700">Buat draft payroll dari data absensi yang sudah tersinkron? Draft dapat diperiksa lalu diposting ke Keuangan Baru melalui Riwayat Payroll.</p>
           <div className="p-4 bg-gray-50 rounded-lg text-lg font-semibold flex justify-between" style={{ backgroundColor: 'var(--color-gray-50)', borderRadius: 'var(--radius-md)' }}>
             <span>Total Payout:</span>
-            <span>{formatRupiah(calculatedPayroll?.reduce((acc, emp) => acc + emp.totalPay, 0) || 0)}</span>
+            <span>{formatRupiah(totalFee)}</span>
           </div>
         </div>
         <div className="modal-footer">
           <button type="button" className="btn btn-outline" onClick={() => setIsConfirmModalOpen(false)}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={handleConfirm}>Buat Draft Payroll</button>
+          <button type="button" className="btn btn-primary" disabled={savingPayroll} onClick={handleConfirm}>{savingPayroll ? 'Menyimpan…' : 'Buat Draft Payroll'}</button>
         </div>
       </Modal>
     </div>
