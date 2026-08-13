@@ -3,18 +3,28 @@ import React, { useEffect, useRef } from 'react';
 const Modal = ({ isOpen, onClose, title, children }) => {
   const overlayRef = useRef(null);
   const dialogRef = useRef(null);
+  const closeRef = useRef(onClose);
   const titleId = `modal-title-${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
 
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') closeRef.current();
+      if (e.key === 'Tab' && dialogRef.current) {
+        const items = [...dialogRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')];
+        if (!items.length) return;
+        const first = items[0], last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     };
     if (isOpen) {
       window.addEventListener('keydown', handleEscape);
       setTimeout(() => dialogRef.current?.focus(), 0);
     }
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

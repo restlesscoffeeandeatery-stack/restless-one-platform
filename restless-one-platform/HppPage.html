@@ -1,0 +1,3384 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="restless-worker-url" content="<?= cloudflareWorkerUrl ?>">
+  <meta name="restless-admin-key" content="<?= platformAdminKey ?>">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HPP Manager — Restless</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink:     #1C1208;
+      --brown:   #4A2810;
+      --caramel: #B8762A;
+      --gold:    #D4A040;
+      --sand:    #E8D0A0;
+      --cream:   #F5EDE0;
+      --paper:   #FBF7F1;
+      --white:   #FFFFFF;
+      --muted:   #7A6040;
+      --green:   #2E6B45;
+      --red:     #8B2515;
+      --border:  #EDE3CE;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:var(--paper);color:var(--ink);font-family:'DM Sans',sans-serif;font-weight:300;font-size:14px;line-height:1.6}
+
+    /* ── TOPBAR ── */
+    .topbar{background:var(--ink);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;position:sticky;top:0;z-index:200}
+    .topbar-brand{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:var(--cream);letter-spacing:1px}
+    .topbar-brand span{color:var(--gold);font-style:italic}
+    .topbar-right{display:flex;align-items:center;gap:12px}
+    .ss-link{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(232,208,160,.5);text-decoration:none;border:1px solid rgba(184,118,42,.3);padding:6px 12px;transition:all .2s}
+    .ss-link:hover{color:var(--gold);border-color:var(--caramel)}
+
+    /* ── NAV ── */
+    .nav{background:var(--brown);display:flex;padding:0 0 0 24px;overflow-x:auto;scrollbar-width:none}
+    .nav::-webkit-scrollbar{display:none}
+    .nav-btn{padding:13px 18px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(232,208,160,.5);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none;font-family:'DM Sans',sans-serif;font-weight:400}
+    .nav-btn.active,.nav-btn:hover{color:var(--gold);border-bottom-color:var(--caramel)}
+
+    /* ── PAGES ── */
+    .page{display:none;padding:32px 24px;max-width:1100px;margin:0 auto}
+    .page.active{display:block}
+
+    /* ── CARDS ── */
+    .card{background:var(--white);border:1px solid var(--border);padding:20px 24px;margin-bottom:16px}
+    .card-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;color:var(--brown);margin-bottom:16px}
+
+    /* ── STATS ── */
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+    .stat{background:var(--ink);padding:20px 24px}
+    .stat-val{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:700;color:var(--gold);line-height:1}
+    .stat-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(232,208,160,.5);margin-top:6px}
+
+    /* ── TABLES ── */
+    .tbl-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead tr{background:var(--ink)}
+    th{padding:10px 14px;text-align:left;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:400;white-space:nowrap}
+    td{padding:10px 14px;border-bottom:1px solid var(--border);color:#3D2B1A;vertical-align:middle}
+    tr:hover td{background:rgba(184,118,42,.04)}
+    .num{text-align:right;font-variant-numeric:tabular-nums}
+
+    /* ── BADGES ── */
+    .badge{display:inline-block;font-size:10px;padding:2px 8px;font-weight:500;border-radius:2px}
+    .badge-green{background:#E8F5EE;color:var(--green)}
+    .badge-amber{background:#FEF3E2;color:#B45309}
+    .badge-red{background:#FDECEA;color:var(--red)}
+
+    /* ── BUTTONS ── */
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .2s}
+    .btn-primary{background:var(--caramel);color:white}
+    .btn-primary:hover{background:var(--brown)}
+    .btn-dark{background:var(--ink);color:var(--sand)}
+    .btn-dark:hover{background:var(--brown)}
+    .btn-outline{background:transparent;color:var(--caramel);border:1px solid var(--caramel)}
+    .btn-outline:hover{background:var(--caramel);color:white}
+    .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);font-size:10px;padding:5px 10px}
+    .btn-ghost:hover{border-color:var(--caramel);color:var(--caramel)}
+    .btn-danger{background:transparent;color:var(--red);border:1px solid #FACACA;font-size:10px;padding:5px 10px}
+    .btn-danger:hover{background:var(--red);color:white}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+
+    /* ── FORMS ── */
+    .form-row{display:grid;gap:16px;margin-bottom:16px}
+    .form-row.col2{grid-template-columns:1fr 1fr}
+    .form-row.col3{grid-template-columns:1fr 1fr 1fr}
+    .form-row.col4{grid-template-columns:1fr 1fr 1fr 1fr}
+    .form-group{display:flex;flex-direction:column;gap:5px}
+    label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--caramel);font-weight:500}
+    input,select{padding:9px 12px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:300;outline:none;transition:border-color .2s;width:100%}
+    input:focus,select:focus{border-color:var(--caramel)}
+    input.error{border-color:var(--red)}
+
+    /* ── AUTOCOMPLETE ── */
+    .ac-wrap{position:relative}
+    .ac-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--white);border:1px solid var(--border);border-top:none;z-index:300;max-height:200px;overflow-y:auto;display:none;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+    .ac-dropdown.open{display:block}
+    .ac-item{padding:9px 12px;cursor:pointer;font-size:13px;color:#3D2B1A;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .ac-item:last-child{border-bottom:none}
+    .ac-item:hover,.ac-item.active,.ac-item.kb-active{background:var(--cream)}
+    .ac-item-price{font-size:11px;color:var(--muted)}
+    .ac-item-new{color:var(--caramel);font-style:italic}
+
+    /* ── RECIPE ROWS ── */
+    .recipe-section{margin-top:24px;border-top:1px solid var(--border);padding-top:20px}
+    .recipe-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .recipe-title{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--caramel);font-weight:500}
+    .recipe-rows{display:flex;flex-direction:column;gap:8px}
+    .recipe-row{display:grid;grid-template-columns:1fr 80px 120px 100px 28px;gap:8px;align-items:start}
+    .recipe-row-sub{font-size:11px;color:var(--muted);padding:4px 12px;background:var(--cream);text-align:right}
+    .recipe-del{background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:9px 0;transition:color .2s}
+    .recipe-del:hover{color:var(--red)}
+
+    /* ── HPP SUMMARY ── */
+    .hpp-box{background:var(--ink);padding:20px 24px;margin-top:20px}
+    .hpp-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;color:rgba(232,208,160,.6)}
+    .hpp-row.total{border-bottom:none;font-size:15px;font-weight:500;color:var(--gold);padding-top:12px}
+    .hpp-row span:last-child{font-variant-numeric:tabular-nums}
+
+    /* ── PAGE HEADER ── */
+    .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+    .page-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;color:var(--ink)}
+    .page-title em{font-style:italic;color:var(--brown)}
+
+    /* ── SEARCH ── */
+    .search-bar{display:flex;gap:10px;margin-bottom:16px}
+    .search-input{flex:1;padding:9px 14px;border:1px solid var(--border);background:var(--white);font-size:13px;font-family:'DM Sans',sans-serif;outline:none}
+    .search-input:focus{border-color:var(--caramel)}
+
+    /* ── ALERTS ── */
+    .alert{padding:12px 16px;margin-bottom:16px;font-size:13px;display:none}
+    .alert-success{background:#E8F5EE;color:var(--green);border-left:3px solid var(--green)}
+    .alert-error{background:#FDECEA;color:var(--red);border-left:3px solid var(--red)}
+    .alert.show{display:block}
+
+    .field-lock {
+      font-size: 10px;
+      margin-left: 3px;
+      cursor: help;
+      opacity: 0.7;
+    }
+    input[readonly] {
+      cursor: not-allowed;
+    }
+
+    /* ── COMBO INPUT (editable dropdown) ── */
+    .combo-wrap { position: relative; }
+    .combo-input { width: 100%; padding-right: 32px; }
+    .combo-arrow {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: 12px; cursor: pointer;
+      pointer-events: all; user-select: none; line-height: 1;
+    }
+    .combo-wrap .ac-dropdown { border-top: 1px solid var(--border); }
+    .combo-new-tag {
+      font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+      background: var(--caramel); color: white; padding: 2px 6px; margin-left: 6px;
+    }
+
+    /* ── LOADING ── */
+    .loading{text-align:center;padding:40px;color:var(--muted);font-size:13px;font-style:italic}
+
+    /* ── MODAL ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(28,18,8,.6);z-index:500;display:none;align-items:center;justify-content:center}
+    .modal-overlay.open{display:flex}
+    .modal{background:var(--white);padding:28px 32px;max-width:480px;width:90%;max-height:90vh;overflow-y:auto}
+    .modal-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:var(--ink);margin-bottom:20px}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
+    /* ── WARNING BOX ── */
+    .warn-list{padding:12px 16px;background:#FEF3E2;border-left:3px solid #D97706}
+    .warn-list li{font-size:12px;color:#92400E;margin:3px 0}
+
+    /* ── RESEP DROPDOWN ROW ── */
+    .resep-detail-row td { padding: 0 !important; border-bottom: 2px solid var(--caramel) !important; }
+    .resep-detail-inner {
+      background: var(--ink);
+      padding: 0;
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.35s cubic-bezier(.4,0,.2,1);
+    }
+    .resep-detail-inner table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .resep-detail-inner thead tr { background: rgba(255,255,255,.04); }
+    .resep-detail-inner th {
+      padding: 8px 16px; text-align: left;
+      font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--caramel); font-weight: 400; border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .resep-detail-inner td {
+      padding: 8px 16px !important; color: rgba(232,208,160,.75) !important;
+      border-bottom: 1px solid rgba(255,255,255,.04) !important;
+    }
+    .resep-detail-inner tr:last-child td { border-bottom: none !important; }
+    .resep-detail-inner .r-num { text-align: right; font-variant-numeric: tabular-nums; }
+    .resep-detail-inner .r-total {
+      color: var(--gold) !important; font-weight: 500;
+    }
+    #produkTable tr[id^="prod-row-"]:hover td { background: rgba(184,118,42,.06); }
+    #produkTable tr[id^="prod-row-"].expanded td { background: rgba(28,18,8,.4); }
+
+    /* ── BUNDLING PAGE ── */
+    .bundle-layout{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;align-items:start}
+    .bundle-panel{background:var(--white);border:1px solid var(--border);padding:20px}
+    .bundle-panel-title{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--caramel);margin-bottom:14px}
+    .bundle-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+    .bundle-item:last-child{border-bottom:none}
+    .bundle-item-color{width:6px;height:36px;border-radius:2px;flex-shrink:0}
+    .bundle-item-info{flex:1;min-width:0}
+    .bundle-item-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bundle-item-meta{font-size:11px;color:var(--muted)}
+    .bundle-item-price{font-size:13px;font-weight:500;text-align:right;flex-shrink:0}
+    .bundle-remove{background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:0 4px;flex-shrink:0}
+    .bundle-remove:hover{color:var(--red)}
+    .kpi-mini{background:var(--paper);padding:14px 16px;text-align:center}
+    .kpi-mini-val{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;line-height:1}
+    .kpi-mini-lbl{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:4px}
+    .scenario-card{background:var(--paper);padding:14px 16px;border-left:3px solid var(--border);cursor:pointer;transition:all .15s}
+    .scenario-card:hover{background:var(--cream)}
+    .scenario-card.selected{background:var(--cream);border-left-color:var(--caramel)}
+    .bundle-ref{background:var(--paper);padding:14px 16px;border-bottom:1px solid var(--border)}
+    .bundle-ref:last-child{border-bottom:none}
+    .product-pick{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;
+                  cursor:pointer;border-bottom:1px solid var(--border)}
+    .product-pick:hover{background:var(--cream)}
+    .product-pick.in-bundle{opacity:.4;cursor:not-allowed}
+    .product-pick-add{background:var(--caramel);color:white;border:none;width:22px;height:22px;
+                      border-radius:2px;cursor:pointer;font-size:14px;flex-shrink:0;line-height:1}
+    @media(max-width:780px){.bundle-layout{grid-template-columns:1fr}}
+
+    /* ── PROGRESS BAR ── */
+    #prog-wrap {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 9999;
+      pointer-events: none;
+      display: none;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    #prog-track {
+      height: 4px;
+      background: rgba(28,18,8,.7);
+      width: 100%;
+    }
+    #prog-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--caramel);
+      transition: width 0.28s cubic-bezier(.4,0,.2,1);
+      position: relative;
+    }
+    #prog-fill::after {
+      content: '';
+      position: absolute;
+      right: 0; top: 0;
+      width: 60px; height: 100%;
+      background: linear-gradient(to right, transparent, rgba(212,160,64,.6));
+    }
+    #prog-pill {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--ink);
+      border: 1px solid rgba(184,118,42,.4);
+      padding: 5px 16px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      pointer-events: none;
+      white-space: nowrap;
+      box-shadow: 0 4px 16px rgba(0,0,0,.3);
+      z-index: 9999;
+    }
+    #prog-pill-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--caramel);
+      animation: prog-pulse 0.8s ease-in-out infinite alternate;
+      flex-shrink: 0;
+    }
+    #prog-pill-label {
+      color: rgba(232,208,160,.75);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    #prog-pill-pct {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--gold);
+      min-width: 42px;
+      text-align: right;
+    }
+    @keyframes prog-pulse {
+      from { opacity: 1; transform: scale(1); }
+      to   { opacity: .4; transform: scale(.7); }
+    }
+    #prog-wrap.prog-error #prog-fill  { background: var(--red); }
+    #prog-wrap.prog-error #prog-pill-dot { background: var(--red); animation: none; }
+    #prog-wrap.prog-done  #prog-fill  { background: var(--green); }
+    #prog-wrap.prog-done  #prog-pill-dot { background: var(--green); animation: none; }
+    .nav-more-item{
+      display:flex;align-items:center;gap:10px;width:100%;padding:12px 18px;
+      background:none;border:none;border-bottom:1px solid rgba(212,160,64,.08);
+      color:rgba(232,208,160,.65);font-size:10px;letter-spacing:3px;text-transform:uppercase;
+      cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:400;text-align:left;
+      transition:background .15s;
+    }
+    .nav-more-item:last-child{border-bottom:none}
+    .nav-more-item:hover,.nav-more-item.active{background:rgba(212,160,64,.1);color:var(--gold)}
+    #nav-more-btn:hover,#nav-more-btn.open{color:var(--gold)}
+
+    .topbar { z-index: 201; }
+    #nav-wrapper { z-index: 200; }
+
+    /* UX refresh */
+    html{scroll-behavior:smooth}
+    body{min-height:100vh;background:radial-gradient(circle at 90% -10%,rgba(212,160,64,.12),transparent 28rem),var(--paper)}
+    button,input,select{border-radius:8px}
+    button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid rgba(212,160,64,.38);outline-offset:2px}
+    .skip-link{position:fixed;left:16px;top:-64px;z-index:2000;background:var(--gold);color:var(--ink);padding:10px 14px;border-radius:0 0 8px 8px;font-weight:600;text-decoration:none;transition:top .2s}
+    .skip-link:focus{top:0}
+    .topbar{height:64px;padding:0 clamp(16px,4vw,40px);box-shadow:0 8px 28px rgba(28,18,8,.16)}
+    .brand-lockup{display:flex;align-items:center;gap:12px}.brand-mark{width:36px;height:36px;border:1px solid rgba(212,160,64,.45);border-radius:10px;display:grid;place-items:center;color:var(--gold);font-family:'Cormorant Garamond',serif;font-weight:700;font-size:18px}
+    .brand-meta{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(232,208,160,.45);line-height:1}
+    .top-status{display:flex;align-items:center;gap:7px;color:rgba(232,208,160,.65);font-size:11px}.status-dot{width:7px;height:7px;border-radius:99px;background:#5DBE8A;box-shadow:0 0 0 4px rgba(93,190,138,.12)}
+    #nav-wrapper{top:64px!important;backdrop-filter:blur(16px);background:rgba(74,40,16,.96)!important}.nav{padding-left:clamp(8px,3vw,32px)}.nav-btn{min-height:48px;border-radius:0}
+    .page{padding:36px clamp(16px,4vw,40px) 72px;max-width:1200px;animation:pageIn .28s ease}@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .page-header{align-items:flex-end;margin-bottom:26px}.page-title{font-size:clamp(29px,4vw,40px);line-height:1.05}.page-kicker{display:block;font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--caramel);margin-bottom:7px;font-style:normal}
+    .card,.bundle-panel{border-radius:14px;box-shadow:0 8px 28px rgba(74,40,16,.055)}.stat{border-radius:14px;position:relative;overflow:hidden;box-shadow:0 8px 24px rgba(28,18,8,.12)}
+    .stat::after{content:'';position:absolute;width:88px;height:88px;border:1px solid rgba(212,160,64,.12);border-radius:50%;right:-24px;top:-28px}
+    .btn{min-height:44px;border-radius:9px;justify-content:center}.btn-primary{box-shadow:0 6px 16px rgba(184,118,42,.22)}input,select,.search-input{min-height:44px;background:var(--white)}
+    .tbl-wrap{background:var(--white);border:1px solid var(--border);border-radius:14px;overflow:auto;box-shadow:0 8px 28px rgba(74,40,16,.05)}table thead{position:sticky;top:0;z-index:2}td{height:52px}
+    .modal-overlay{padding:16px;backdrop-filter:blur(6px)}.modal{border-radius:18px;box-shadow:0 28px 70px rgba(28,18,8,.35);position:relative}.modal-close{position:absolute;right:12px;top:10px;width:44px;height:44px;border:0;background:transparent;font-size:22px;color:var(--muted);cursor:pointer}
+    #toast-region{position:fixed;right:18px;bottom:18px;z-index:3000;display:grid;gap:8px;max-width:360px}.ux-toast{background:var(--ink);color:var(--cream);padding:13px 16px;border-radius:10px;box-shadow:0 14px 36px rgba(28,18,8,.28);animation:toastIn .22s ease;font-size:13px;border-left:3px solid var(--gold)}.ux-toast.error{border-left-color:#E36A55}.ux-toast.success{border-left-color:#5DBE8A}@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    @media(max-width:640px){
+      .stats{grid-template-columns:1fr}
+      .form-row.col2,.form-row.col3,.form-row.col4{grid-template-columns:1fr}
+      .recipe-row{grid-template-columns:1fr 60px 100px 90px 28px}
+      .page{padding:24px 14px 80px}.top-status{display:none}.ss-link{font-size:0;padding:8px 10px}.ss-link::before{content:'Sheet ↗';font-size:10px}.page-header{align-items:flex-start;gap:14px;flex-direction:column}.page-header>div:last-child{width:100%;flex-wrap:wrap}.page-header>.btn{width:100%}.modal{padding:24px 18px}.btn{letter-spacing:1px}
+    }
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#page-dashboard">Lewati ke konten utama</a>
+<div id="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+<!-- PROGRESS BAR -->
+<div id="prog-wrap">
+  <div id="prog-track"><div id="prog-fill"></div></div>
+</div>
+<div id="prog-pill">
+  <div id="prog-pill-dot"></div>
+  <span id="prog-pill-label">Memproses</span>
+  <span id="prog-pill-pct">0%</span>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand-lockup"><div class="brand-mark" aria-hidden="true">R</div><div><div class="topbar-brand">Restless <span>HPP</span></div><div class="brand-meta">Cost &amp; Margin Studio</div></div></div>
+  <div class="topbar-right">
+    <div class="top-status"><span class="status-dot"></span><span>Siap digunakan</span></div>
+    <a id="ssLink" class="ss-link" href="#" target="_blank">Buka Spreadsheet ↗</a>
+  </div>
+</div>
+
+<!-- NAV -->
+<!-- NAV WRAPPER — sticky, hamburger outside nav overflow context -->
+<div id="nav-wrapper" style="position:sticky;top:52px;z-index:200;background:var(--brown);
+     display:flex;align-items:stretch;border-bottom:2px solid rgba(212,160,64,.15)">
+
+  <nav class="nav" style="flex:1" aria-label="Navigasi utama">
+    <button class="nav-btn active" onclick="showPage('dashboard',this)" aria-current="page">Dashboard</button>
+    <button class="nav-btn" onclick="showPage('inputProduk',this)">Input Produk</button>
+    <button class="nav-btn" onclick="showPage('prep',this)">Preparation</button>
+    <button class="nav-btn" onclick="showPage('produk',this)">Semua Produk</button>
+  </nav>
+
+  <!-- Hamburger — OUTSIDE nav overflow so dropdown is not clipped -->
+  <div style="position:relative;flex-shrink:0;display:flex;align-items:center;
+              padding:0 4px;border-left:1px solid rgba(212,160,64,.1)">
+    <button id="nav-more-btn" onclick="toggleNavMore(event)" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-dropdown"
+            style="padding:12px 16px;background:none;border:none;cursor:pointer;
+                   color:rgba(232,208,160,.5);font-size:20px;line-height:1;
+                   transition:color .2s;font-family:'DM Sans',sans-serif"
+            title="Menu lainnya">≡</button>
+
+    <div id="nav-more-dropdown" role="menu"
+         style="display:none;position:absolute;top:100%;right:0;
+                background:var(--brown);min-width:190px;
+                border:1px solid rgba(212,160,64,.25);
+                box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:500">
+      <button class="nav-more-item" onclick="showPageMore('bahan')">
+        <span style="font-size:14px;width:18px;text-align:center">⊞</span> Bahan Baku
+      </button>
+      <button class="nav-more-item" onclick="showPageMore('import')">
+        <span style="font-size:14px;width:18px;text-align:center">↓</span> Import Massal
+      </button>
+      <button class="nav-more-item" onclick="showPageMore('bundling')">
+        <span style="font-size:14px;width:18px;text-align:center">◈</span> Simulasi Bundling
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ PAGE: DASHBOARD ══ -->
+<div class="page active" id="page-dashboard" tabindex="-1">
+  <div class="page-header">
+    <div class="page-title"><span class="page-kicker">Ringkasan bisnis</span>Dashboard <em>Overview</em></div>
+    <button class="btn btn-outline" onclick="loadDashboard()">↺ Refresh</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="d-produk">—</div><div class="stat-label">Total Produk</div></div>
+    <div class="stat"><div class="stat-val" id="d-bahan">—</div><div class="stat-label">Total Bahan Baku</div></div>
+    <div class="stat"><div class="stat-val" id="d-margin">—%</div><div class="stat-label">Rata-rata Margin</div></div>
+  </div>
+
+  <div class="form-row col2">
+    <div class="card">
+      <div class="card-title">✦ Produk Margin Tertinggi</div>
+      <div id="d-topProfit" class="loading">Memuat...</div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--red)">⚠ Perlu Perhatian (Margin &lt;50%)</div>
+      <div id="d-lowMargin" class="loading">Memuat...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: BAHAN BAKU ══ -->
+<div class="page" id="page-bahan">
+  <div class="page-header">
+    <div class="page-title">Master <em>Bahan Baku</em></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" onclick="refreshBahan()" id="btnRefreshBahan">↺ Refresh</button>
+      <button class="btn btn-primary" onclick="openBahanModal()">+ Tambah Bahan</button>
+    </div>
+  </div>
+  <div id="alert-bahan" class="alert"></div>
+  <div class="search-bar">
+    <input class="search-input" placeholder="Cari nama bahan…" oninput="filterBahan(this.value)">
+  </div>
+  <div class="tbl-wrap">
+    <table id="bahanTable">
+      <thead>
+        <tr>
+          <th>Nama Bahan</th><th>Satuan</th><th class="num">Harga/Satuan (Rp)</th>
+          <th>Kategori</th><th>Terakhir Update</th><th style="width:90px"></th>
+        </tr>
+      </thead>
+      <tbody id="bahanBody"><tr><td colspan="6" class="loading">Memuat data…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ PAGE: INPUT PRODUK ══ -->
+<div class="page" id="page-inputProduk">
+  <div class="page-header">
+    <div class="page-title" id="formProdukTitle">Input <em>Produk Baru</em></div>
+    <button class="btn btn-ghost" onclick="resetProdukForm()">↺ Reset Form</button>
+  </div>
+  <div id="alert-produk" class="alert"></div>
+
+  <div class="card">
+    <input type="hidden" id="editProdukId">
+
+    <div class="form-row col3">
+      <div class="form-group">
+        <label>Nama Produk *</label>
+        <input id="f-nama" placeholder="contoh: Ayam Goreng Lengkuas" onkeydown="_formEnter(event,saveProduk)">
+      </div>
+      <div class="form-group">
+        <label>Kategori Menu *</label>
+        <div class="combo-wrap" id="combo-kategoriMenu">
+          <input id="f-kategori" class="combo-input" placeholder="Pilih atau ketik kategori baru…"
+                 autocomplete="off"
+                 oninput="comboFilter('komboMenu', this.value)"
+                 onfocus="comboOpen('komboMenu')"
+                 onblur="comboBlur('komboMenu')"
+                 onkeydown="_ddKey(event,'komboMenu')">
+          <div class="combo-arrow" onclick="comboToggle('komboMenu')">▾</div>
+          <div class="ac-dropdown" id="komboMenu"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Harga Jual (Rp) *</label>
+        <input id="f-hargaJual" type="number" placeholder="contoh: 37000" oninput="recalcHPP()" onkeydown="_formEnter(event,saveProduk)">
+      </div>
+    </div>
+
+    <!-- OVERHEAD ROW -->
+    <div class="form-row col3" style="align-items:end">
+      <div class="form-group">
+        <label>Overhead HPP (%)</label>
+        <div style="position:relative">
+          <input id="f-overhead" type="number" min="0" max="100" step="0.1"
+                 placeholder="contoh: 30" oninput="recalcHPP()"
+                 style="padding-right:32px">
+          <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none">%</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="opacity:0">—</label>
+        <div id="overhead-presets" style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn btn-ghost" style="font-size:10px;padding:8px 10px" onclick="setOverhead(20)">20%</button>
+          <button type="button" class="btn btn-ghost" style="font-size:10px;padding:8px 10px" onclick="setOverhead(25)">25%</button>
+          <button type="button" class="btn btn-ghost" style="font-size:10px;padding:8px 10px" onclick="setOverhead(30)">30%</button>
+          <button type="button" class="btn btn-ghost" style="font-size:10px;padding:8px 10px" onclick="setOverhead(35)">35%</button>
+          <button type="button" class="btn btn-ghost" style="font-size:10px;padding:8px 10px" onclick="setOverhead(40)">40%</button>
+        </div>
+      </div>
+      <div id="overhead-hint" style="font-size:12px;color:var(--muted);font-style:italic;padding-bottom:10px">
+        Overhead mencakup biaya listrik, gas, gaji, sewa, kemasan, dan biaya operasional lainnya.
+      </div>
+    </div>
+
+    <!-- RECIPE SECTION -->
+    <div class="recipe-section">
+      <div class="recipe-header">
+        <div class="recipe-title">Bahan Baku &amp; Resep</div>
+      </div>
+      <div class="recipe-rows" id="recipeRows"></div>
+      <button class="btn btn-outline" onclick="addIngredientRow()"
+              style="margin-top:10px;width:100%">+ Tambah Bahan</button>
+    </div>
+
+    <!-- HPP SUMMARY -->
+    <div class="hpp-box" id="hppBox" style="display:none">
+      <div id="hpp-detail"></div>
+      <div class="hpp-row" style="border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding-top:12px">
+        <span>HPP Bahan Baku</span>
+        <span id="hpp-bahan">Rp 0</span>
+      </div>
+      <div class="hpp-row" id="hpp-overhead-row" style="display:none">
+        <span id="hpp-overhead-label">Overhead (0%)</span>
+        <span id="hpp-overhead-val">Rp 0</span>
+      </div>
+      <div class="hpp-row total" style="border-top:1px solid rgba(255,255,255,.15);margin-top:4px">
+        <span>HPP Total</span>
+        <span id="hpp-total">Rp 0</span>
+      </div>
+      <div class="hpp-row" id="hpp-margin-row">
+        <span>Margin (vs Harga Jual)</span>
+        <span id="hpp-margin">—</span>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;display:flex;gap:10px">
+      <button class="btn btn-primary" onclick="saveProduk()" id="btnSaveProduk">Simpan Produk</button>
+      <button class="btn btn-ghost" onclick="resetProdukForm()">Batalkan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: IMPORT MASSAL ══ -->
+<div class="page" id="page-import">
+  <div class="page-header">
+    <div class="page-title">Import <em>Massal</em></div>
+  </div>
+  <div id="alert-import" class="alert"></div>
+
+  <!-- TAB -->
+  <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px">
+    <button class="import-tab active" onclick="switchImportTab('produk',this)"
+      style="padding:10px 20px;font-size:10px;letter-spacing:3px;text-transform:uppercase;
+             background:none;border:none;border-bottom:2px solid var(--caramel);
+             margin-bottom:-2px;cursor:pointer;color:var(--gold);font-family:'DM Sans',sans-serif">
+      Produk
+    </button>
+    <button class="import-tab" onclick="switchImportTab('bahan',this)"
+      style="padding:10px 20px;font-size:10px;letter-spacing:3px;text-transform:uppercase;
+             background:none;border:none;border-bottom:2px solid transparent;
+             margin-bottom:-2px;cursor:pointer;color:var(--muted);font-family:'DM Sans',sans-serif">
+      Bahan Baku
+    </button>
+  </div>
+
+  <!-- IMPORT PRODUK TAB -->
+  <div id="import-tab-produk">
+    <div class="card" style="margin-bottom:16px;background:var(--ink);border:none">
+      <div style="font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--caramel);margin-bottom:10px">
+        Format CSV — satu produk per baris
+      </div>
+      <div style="font-family:monospace;font-size:12px;color:var(--sand);line-height:1.8">
+        Nama Produk , Kategori Menu , Harga Jual , HPP Bahan (opsional) , Overhead %<br>
+        <span style="color:rgba(232,208,160,.4)">
+        SOTO AYAM , Nusantara , 35000 , 12000 , 40<br>
+        GADO-GADO , Soup & Salad , 32000 , , 40<br>
+        TAHU CRISPY , Cemilan & Sharing , 22000 , 5000 , 35
+        </span>
+      </div>
+      <div style="font-size:11px;color:rgba(232,208,160,.4);margin-top:10px">
+        ✦ HPP Bahan boleh dikosongkan — bisa dilengkapi resep bahan per produk nanti<br>
+        ✦ Overhead % default 40 jika dikosongkan · Produk yang sudah ada tidak akan ditimpa
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Paste CSV di bawah ini *</label>
+      <textarea id="csv-produk" rows="12"
+        style="width:100%;padding:12px;border:1px solid var(--border);
+               background:var(--white);font-family:monospace;font-size:13px;
+               resize:vertical;outline:none;font-weight:400;color:var(--ink)"
+        placeholder="Nama Produk,Kategori,Harga Jual,HPP Bahan,Overhead%&#10;SOTO AYAM,Nusantara,35000,12000,40&#10;GADO-GADO,Soup &amp; Salad,32000,,40"
+        oninput="previewImport('produk')"></textarea>
+    </div>
+
+    <div id="preview-produk" style="display:none;margin-bottom:16px">
+      <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;
+                  color:var(--caramel);margin-bottom:8px">Preview — <span id="preview-count-produk">0</span> baris valid</div>
+      <div style="overflow-x:auto">
+        <table id="preview-table-produk">
+          <thead><tr>
+            <th>Nama Produk</th><th>Kategori</th>
+            <th class="num">Harga Jual</th><th class="num">HPP Bahan</th>
+            <th class="num">Overhead %</th><th class="num">Margin Est.</th>
+          </tr></thead>
+          <tbody id="preview-body-produk"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="btn-import-produk" onclick="runImport('produk')" disabled>
+      Import Produk
+    </button>
+  </div>
+
+  <!-- IMPORT BAHAN TAB -->
+  <div id="import-tab-bahan" style="display:none">
+    <div class="card" style="margin-bottom:16px;background:var(--ink);border:none">
+      <div style="font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--caramel);margin-bottom:10px">
+        Format CSV — satu bahan per baris
+      </div>
+      <div style="font-family:monospace;font-size:12px;color:var(--sand);line-height:1.8">
+        Nama Bahan , Satuan , Harga/Satuan , Kategori<br>
+        <span style="color:rgba(232,208,160,.4)">
+        BAWANG PUTIH , gram , 35 , Sayuran<br>
+        SANTAN KARA , ml , 28 , Lainnya<br>
+        DAUN SALAM , gram , 15 , Bumbu
+        </span>
+      </div>
+      <div style="font-size:11px;color:rgba(232,208,160,.4);margin-top:10px">
+        ✦ Bahan yang namanya sudah ada di database tidak akan ditimpa<br>
+        ✦ Kategori default "Lainnya" jika dikosongkan
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Paste CSV di bawah ini *</label>
+      <textarea id="csv-bahan" rows="12"
+        style="width:100%;padding:12px;border:1px solid var(--border);
+               background:var(--white);font-family:monospace;font-size:13px;
+               resize:vertical;outline:none;font-weight:400;color:var(--ink)"
+        placeholder="Nama Bahan,Satuan,Harga/Satuan,Kategori&#10;BAWANG PUTIH,gram,35,Sayuran&#10;SANTAN KARA,ml,28,Lainnya"
+        oninput="previewImport('bahan')"></textarea>
+    </div>
+
+    <div id="preview-bahan" style="display:none;margin-bottom:16px">
+      <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;
+                  color:var(--caramel);margin-bottom:8px">Preview — <span id="preview-count-bahan">0</span> baris valid</div>
+      <div style="overflow-x:auto">
+        <table id="preview-table-bahan">
+          <thead><tr>
+            <th>Nama Bahan</th><th>Satuan</th>
+            <th class="num">Harga/Satuan</th><th>Kategori</th>
+          </tr></thead>
+          <tbody id="preview-body-bahan"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="btn-import-bahan" onclick="runImport('bahan')" disabled>
+      Import Bahan Baku
+    </button>
+  </div>
+</div>
+
+<!-- ══ PAGE: PREPARATION ══ -->
+<div class="page" id="page-prep">
+  <div class="page-header">
+    <div class="page-title">Input <em>Preparation</em></div>
+    <button class="btn btn-ghost" onclick="resetPrepForm()">↺ Reset Form</button>
+  </div>
+  <div id="alert-prep" class="alert"></div>
+
+  <!-- FORM -->
+  <div class="card" style="margin-bottom:20px">
+    <input type="hidden" id="edit-prep-id">
+    <input type="hidden" id="edit-prep-bbid">
+
+    <div class="form-row col3">
+      <div class="form-group">
+        <label>Nama Preparation *</label>
+        <input id="prep-nama" placeholder="contoh: Bumbu Base Ayam" onkeydown="_formEnter(event,savePrep)">
+      </div>
+      <div class="form-group">
+        <label>Satuan Hasil *</label>
+        <select id="prep-satuan" onchange="recalcPrep()">
+          <option value="">— Pilih Satuan —</option>
+          <option>gram</option><option>kg</option><option>ml</option><option>liter</option>
+          <option>porsi</option><option>butir</option><option>pcs</option><option>bungkus</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Yield / Jumlah Hasil</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="prep-yield" type="number" min="0" step="any"
+                 placeholder="Otomatis dari total bahan"
+                 oninput="onYieldManualInput()"
+                 style="flex:1">
+          <button type="button" id="btn-yield-reset" onclick="resetYieldAuto()"
+                  title="Reset ke otomatis (total jumlah bahan)"
+                  style="background:var(--caramel);border:none;color:white;
+                         padding:9px 10px;cursor:pointer;font-size:13px;
+                         flex-shrink:0;display:none">↺</button>
+        </div>
+        <div id="yield-hint" style="font-size:11px;color:var(--caramel);
+                                    margin-top:3px;font-style:italic">
+          Dihitung otomatis dari total jumlah bahan
+        </div>
+      </div>
+    </div>
+
+    <!-- Bahan rows -->
+    <div class="recipe-section">
+      <div class="recipe-header">
+        <div class="recipe-title">Bahan yang Digunakan</div>
+      </div>
+      <div class="recipe-rows" id="prepIngRows"></div>
+      <button class="btn btn-outline" onclick="addPrepIngRow()"
+              style="margin-top:10px;width:100%">+ Tambah Bahan</button>
+    </div>
+
+    <!-- HPP summary -->
+    <div class="hpp-box" id="prepHppBox" style="display:none">
+      <div id="prep-hpp-detail"></div>
+      <div class="hpp-row" style="border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding-top:12px">
+        <span>Total HPP Bahan</span>
+        <span id="prep-hpp-total">Rp 0</span>
+      </div>
+      <div class="hpp-row total">
+        <span>HPP per Satuan Hasil</span>
+        <span id="prep-hpp-per-satuan">Rp 0</span>
+      </div>
+      <div style="font-size:11px;color:rgba(232,208,160,.45);margin-top:8px;font-style:italic">
+        Nilai ini otomatis tersimpan sebagai Harga/Satuan di Master Bahan Baku
+      </div>
+    </div>
+
+    <div style="margin-top:20px;display:flex;gap:10px">
+      <button class="btn btn-primary" onclick="savePrep()" id="btnSavePrep">Simpan Preparation</button>
+      <button class="btn btn-ghost" onclick="resetPrepForm()">Batalkan</button>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <div class="page-header" style="margin-top:8px">
+    <div class="page-title" style="font-size:22px">Daftar <em>Preparation</em></div>
+    <button class="btn btn-outline" onclick="loadPrep()">↺ Refresh</button>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Nama Preparation</th>
+          <th>Satuan Hasil</th>
+          <th class="num">Yield</th>
+          <th class="num">HPP Total</th>
+          <th class="num">HPP/Satuan</th>
+          <th>Tanggal</th>
+          <th style="width:120px"></th>
+        </tr>
+      </thead>
+      <tbody id="prepBody">
+        <tr><td colspan="7" class="loading">Memuat…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ PAGE: SEMUA PRODUK ══ -->
+<div class="page" id="page-produk">
+  <div class="page-header">
+    <div class="page-title">Semua <em>Produk</em></div>
+    <button class="btn btn-outline" onclick="loadProduk()">↺ Refresh</button>
+  </div>
+  <div id="alert-semua" class="alert"></div>
+
+  <!-- Search + Filter bar -->
+  <div class="search-bar" style="flex-wrap:wrap;align-items:center;gap:8px">
+    <input class="search-input" id="search-produk" placeholder="Cari nama produk…"
+           oninput="applyProdukFilter()" style="min-width:200px;flex:1">
+    <select id="filter-kat-produk" onchange="applyProdukFilter()"
+            style="padding:9px 12px;border:1px solid var(--border);background:var(--white);
+                   font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);
+                   cursor:pointer;min-width:140px">
+      <option value="">Semua Kategori</option>
+    </select>
+    <select id="filter-margin-produk" onchange="applyProdukFilter()"
+            style="padding:9px 12px;border:1px solid var(--border);background:var(--white);
+                   font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);
+                   cursor:pointer;min-width:150px">
+      <option value="">Semua Margin</option>
+      <option value="good">≥ 60% — Aman</option>
+      <option value="warn">50–60% — Waspada</option>
+      <option value="bad">&lt; 50% — Perhatian</option>
+    </select>
+    <select id="sort-produk" onchange="applyProdukFilter()"
+            style="padding:9px 12px;border:1px solid var(--border);background:var(--white);
+                   font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);
+                   cursor:pointer;min-width:160px">
+      <option value="">Urutan Default</option>
+      <option value="margin-desc">Margin Tertinggi ↓</option>
+      <option value="margin-asc">Margin Terendah ↑</option>
+      <option value="hpp-desc">HPP Tertinggi ↓</option>
+      <option value="hpp-asc">HPP Terendah ↑</option>
+      <option value="nama-asc">Nama A → Z</option>
+      <option value="nama-desc">Nama Z → A</option>
+    </select>
+    <button class="btn btn-ghost" onclick="resetProdukFilter()"
+            style="padding:9px 12px;white-space:nowrap">↺ Reset</button>
+  </div>
+  <div class="tbl-wrap">
+    <table id="produkTable">
+      <thead>
+        <tr>
+          <th style="width:32px"></th>
+          <th>Nama Produk</th><th>Kategori</th>
+          <th class="num">Harga Jual</th>
+          <th class="num">HPP Bahan</th>
+          <th class="num">Overhead</th>
+          <th class="num">HPP Total</th>
+          <th class="num">Margin %</th>
+          <th class="num">Margin Nominal</th>
+          <th>Tanggal</th><th style="width:120px"></th>
+        </tr>
+      </thead>
+      <tbody id="produkBody"><tr><td colspan="11" class="loading">Memuat data…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ MODAL: BAHAN ══ -->
+<div class="modal-overlay" id="bahanModal" role="dialog" aria-modal="true" aria-labelledby="bahanModalTitle" aria-hidden="true">
+  <div class="modal" style="max-width:520px" onkeydown="_formEnter(event,submitBahanModal)">
+    <button class="modal-close" type="button" onclick="closeBahanModal()" aria-label="Tutup modal">&times;</button>
+    <div class="modal-title" id="bahanModalTitle">Tambah Bahan Baku</div>
+    <input type="hidden" id="m-bahanId">
+
+    <div class="form-row col2" style="margin-bottom:12px">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Nama Bahan *</label>
+        <input id="m-nama" placeholder="contoh: Ayam Kampung">
+      </div>
+      <div class="form-group">
+        <label>Satuan *</label>
+        <select id="m-satuan">
+          <option value="">— Pilih —</option>
+          <option>gram</option><option>kg</option><option>ml</option><option>liter</option>
+          <option>butir</option><option>buah</option><option>lembar</option>
+          <option>sendok teh</option><option>sendok makan</option>
+          <option>bungkus</option><option>porsi</option><option>pcs</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Kategori Bahan</label>
+        <div class="combo-wrap">
+          <input id="m-kategori" class="combo-input" placeholder="Pilih atau ketik baru…"
+                 autocomplete="off"
+                 oninput="comboFilter('komboBahan', this.value)"
+                 onfocus="comboOpen('komboBahan')"
+                 onblur="comboBlur('komboBahan')"
+                 onkeydown="_ddKey(event,'komboBahan')">
+          <div class="combo-arrow" onclick="comboToggle('komboBahan')">▾</div>
+          <div class="ac-dropdown" id="komboBahan"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kalkulator harga/satuan -->
+    <div style="background:var(--cream);border:1px solid var(--border);
+                padding:14px 16px;margin-bottom:14px;border-left:3px solid var(--caramel)">
+      <div style="font-size:9px;letter-spacing:4px;text-transform:uppercase;
+                  color:var(--caramel);margin-bottom:12px;font-weight:500">
+        ✦ Hitung Otomatis Harga/Satuan
+      </div>
+      <div class="form-row col2" style="margin-bottom:8px">
+        <div class="form-group">
+          <label>Jumlah yang Dibeli</label>
+          <input id="m-qty-beli" type="number" min="0" step="any"
+                 placeholder="contoh: 1000" oninput="calcHargaSatuan()">
+        </div>
+        <div class="form-group">
+          <label>Total Harga Beli (Rp)</label>
+          <input id="m-total-harga" type="number" min="0"
+                 placeholder="contoh: 50000" oninput="calcHargaSatuan()">
+        </div>
+      </div>
+      <div id="calc-preview" style="font-size:12px;color:var(--muted);font-style:italic;min-height:18px"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Harga/Satuan (Rp) *</label>
+      <input id="m-harga" type="number" min="0" placeholder="Isi manual atau gunakan kalkulator di atas">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeBahanModal()">Batal</button>
+      <button class="btn btn-primary" onclick="submitBahanModal()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: KONFIRMASI HAPUS ══ -->
+<div class="modal-overlay" id="deleteModal" role="alertdialog" aria-modal="true" aria-labelledby="deleteModalTitle" aria-describedby="deleteMsg" aria-hidden="true">
+  <div class="modal">
+    <button class="modal-close" type="button" onclick="closeDeleteModal()" aria-label="Tutup modal">&times;</button>
+    <div class="modal-title" id="deleteModalTitle" style="color:var(--red)">Konfirmasi Hapus</div>
+    <p style="color:var(--muted);font-size:14px" id="deleteMsg">Yakin ingin menghapus item ini?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeDeleteModal()">Batal</button>
+      <button class="btn btn-primary" style="background:var(--red)" onclick="confirmDelete()">Hapus</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const AIO_WORKER_URL=((document.querySelector('meta[name="restless-worker-url"]')||{}).content||'').replace(/\/$/,'');
+const AIO_ADMIN_KEY=(document.querySelector('meta[name="restless-admin-key"]')||{}).content||new URLSearchParams(location.search).get('adminKey')||'';
+// ───────────────────────────────────────────────
+// SAFE GAS RUNNER
+// Deteksi dilakukan saat CALL TIME bukan parse time
+// sehingga tidak pernah menimpa window.google
+// ───────────────────────────────────────────────
+
+// Stub untuk environment non-GAS (preview)
+const _gasStub = {
+  withSuccessHandler(fn) {
+    const self = this;
+    self._sfn = fn;
+    return self;
+  },
+  withFailureHandler(fn) {
+    const self = this;
+    self._ffn = fn;
+    return self;
+  },
+  _reply(data) {
+    const self = this;
+    setTimeout(() => { if (self._sfn) self._sfn(data); }, 60);
+  },
+  getDashboard()    { this._reply({ totalProduk:0, totalBahan:0, avgMargin:0, lowMargin:[], topProfit:[], ssUrl:'#' }); },
+  getBahanBaku()    { this._reply({ items:[], ssUrl:'#' }); },
+  getProduk()       { this._reply({ items:[], ssUrl:'#' }); },
+  getResepByProduk(){ this._reply([]); },
+  saveBahanBaku()   { this._reply({ success:false, error:'Deploy ke Google Apps Script untuk menggunakan fitur ini.' }); },
+  saveProduk()      { this._reply({ success:false, error:'Deploy ke Google Apps Script untuk menggunakan fitur ini.' }); },
+  deleteBahanBaku() { this._reply({ success:false, error:'Deploy ke Google Apps Script untuk menggunakan fitur ini.' }); },
+  deleteProduk()    { this._reply({ success:false, error:'Deploy ke Google Apps Script untuk menggunakan fitur ini.' }); },
+};
+
+// Cek apakah kita di GAS — tidak pernah modifikasi window.google
+function _isGAS() {
+  try {
+    if (AIO_WORKER_URL) return true;
+    if (typeof google === 'undefined' || google === null) return false;
+    if (typeof google.script === 'undefined' || google.script === null) return false;
+    const run = google.script.run;
+    return run !== null
+      && typeof run !== 'undefined'
+      && typeof run.withSuccessHandler === 'function';
+  } catch(e) { return false; }
+}
+
+function cloudflareRun() {
+  let success=()=>{},failure=()=>{},runner;
+  const readFns=new Set(['getDashboard','getBahanBaku','getProduk','getPreparations']);
+  runner=new Proxy({
+    withSuccessHandler(fn){success=typeof fn==='function'?fn:success;return runner;},
+    withFailureHandler(fn){failure=typeof fn==='function'?fn:failure;return runner;}
+  },{get(target,name){if(name in target)return target[name];return(...args)=>{const fn=String(name),key='restless_hpp_'+fn+'_'+JSON.stringify(args);if(readFns.has(fn)){try{const cached=JSON.parse(localStorage.getItem(key)||'null');if(cached){setTimeout(()=>success(cached),0);return runner}}catch(e){}}fetch(AIO_WORKER_URL+'/rpc',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8','X-Restless-Admin-Key':AIO_ADMIN_KEY},body:JSON.stringify({fn,args,adminKey:AIO_ADMIN_KEY}),cache:'no-store',credentials:'omit'}).then(response=>response.json()).then(result=>{if(!result.ok)throw new Error(result.error||'Cloudflare Worker gagal.');if(readFns.has(fn)){try{localStorage.setItem(key,JSON.stringify(result.data))}catch(e){}}else{Object.keys(localStorage).filter(k=>k.indexOf('restless_hpp_')===0).forEach(k=>localStorage.removeItem(k))}success(result.data);}).catch(failure);return runner;};}});
+  return runner;
+}
+
+// gasRun() — dipakai di semua call, cek GAS setiap kali
+function gasRun() {
+  if (AIO_WORKER_URL) return cloudflareRun();
+  return _isGAS() ? google.script.run : Object.create(_gasStub);
+}
+function clearHppReadCache(){try{Object.keys(localStorage).filter(k=>k.indexOf('restless_hpp_')===0).forEach(k=>localStorage.removeItem(k))}catch(e){}}
+
+// Banner preview — hanya muncul jika bukan GAS
+document.addEventListener('DOMContentLoaded', () => {
+  if (_isGAS()) return; // di GAS: tidak tampil
+  const banner = document.createElement('div');
+  banner.id = 'preview-banner';
+  banner.style.cssText = [
+    'position:fixed;bottom:0;left:0;right:0;z-index:9999',
+    'background:#1C1208;border-top:2px solid #B8762A',
+    'padding:12px 24px;display:flex;align-items:center',
+    'justify-content:space-between;gap:16px;font-size:13px'
+  ].join(';');
+  banner.innerHTML = `
+    <span style="color:#E8D0A0">
+      ⚠️ <strong style="color:#D4A040">Mode Preview</strong> —
+      Navigasi aktif. Simpan data hanya berfungsi setelah deploy ke
+      <a href="https://script.google.com" target="_blank"
+         style="color:#B8762A;text-decoration:underline">Google Apps Script</a>.
+    </span>
+    <button onclick="document.getElementById('preview-banner').remove();document.body.style.paddingBottom=''" style="
+      background:transparent;border:1px solid rgba(184,118,42,.5);color:#B8762A;
+      padding:4px 14px;cursor:pointer;font-size:10px;letter-spacing:2px;
+      text-transform:uppercase;font-family:'DM Sans',sans-serif">
+      ✕
+    </button>`;
+  document.body.appendChild(banner);
+  document.body.style.paddingBottom = '52px';
+});
+
+function toggleNavMore(e) {
+  e.stopPropagation();
+  const dd  = document.getElementById('nav-more-dropdown');
+  const btn = document.getElementById('nav-more-btn');
+  const open = dd.style.display === 'block';
+  dd.style.display = open ? 'none' : 'block';
+  btn.classList.toggle('open', !open);
+  btn.setAttribute('aria-expanded', String(!open));
+}
+
+function showPageMore(name) {
+  // Tutup dropdown
+  document.getElementById('nav-more-dropdown').style.display = 'none';
+  document.getElementById('nav-more-btn').classList.remove('open');
+
+  // Hapus active dari semua nav utama dan dropdown items
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-more-item').forEach(b => b.classList.remove('active'));
+
+  // Tandai item dropdown yang aktif
+  const items = document.querySelectorAll('.nav-more-item');
+  const map   = { bahan: 0, import: 1, bundling: 2 };
+  if (map[name] !== undefined) items[map[name]].classList.add('active');
+
+  // Highlight tombol ≡ sebagai tanda ada halaman dropdown aktif
+  document.getElementById('nav-more-btn').classList.add('open');
+  document.getElementById('nav-more-btn').setAttribute('aria-expanded', 'false');
+
+  // Tampilkan halaman
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pg = document.getElementById('page-' + name);
+  if (pg) { pg.classList.add('active'); pg.setAttribute('tabindex','-1'); pg.focus({preventScroll:true}); }
+  history.replaceState(null, '', '#' + name);
+
+  if (name === 'bahan')    loadBahan();
+  if (name === 'import')   { /* no load needed */ }
+  if (name === 'bundling') initBundlingPage();
+}
+
+// Tutup dropdown saat klik di luar
+document.addEventListener('click', () => {
+  const dd = document.getElementById('nav-more-dropdown');
+  if (dd) dd.style.display = 'none';
+  const btn = document.getElementById('nav-more-btn');
+  if (btn) { btn.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }
+});
+
+// ───────────────────────────────────────────────
+// PROGRESS BAR ENGINE
+// ───────────────────────────────────────────────
+const _prog = {
+  _wrap:  null,
+  _fill:  null,
+  _pill:  null,
+  _dot:   null,
+  _lbl:   null,
+  _pct:   null,
+  _timer: null,
+  _cur:   0,
+  _done:  false,
+
+  _init() {
+    if (this._fill) return;
+    this._wrap = document.getElementById('prog-wrap');
+    this._fill = document.getElementById('prog-fill');
+    this._pill = document.getElementById('prog-pill');
+    this._dot  = document.getElementById('prog-pill-dot');
+    this._lbl  = document.getElementById('prog-pill-label');
+    this._pct  = document.getElementById('prog-pill-pct');
+  },
+
+  start(label) {
+    this._init();
+    this._done = false;
+    this._cur  = 0;
+    this._wrap.className = '';
+    this._wrap.style.display = 'flex';
+    this._wrap.style.opacity = '1';
+    this._pill.style.display = 'flex';
+    this._pill.style.opacity = '1';
+    this._pill.className = '';
+    this._lbl.textContent = label || 'Memproses';
+    this._setVal(0);
+    clearTimeout(this._timer);
+
+    const tick = () => {
+      if (this._done) return;
+      this._cur += 15;
+      if (this._cur >= 95) this._cur = 95;
+      this._setVal(this._cur);
+    };
+    this._timer = setInterval(tick, 40);
+  },
+
+  update(pct, label) {
+    this._init();
+    if (label) this._lbl.textContent = label;
+    this._cur = Math.max(this._cur, pct);
+    this._setVal(this._cur);
+  },
+
+  complete(label) {
+    this._init();
+    this._done = true;
+    clearInterval(this._timer);
+    this._wrap.classList.add('prog-done');
+    this._setVal(100);
+    if (label) this._lbl.textContent = label;
+    this._wrap.style.display = 'none';
+    this._pill.style.display = 'none';
+    this._pill.style.opacity = '1';
+    this._wrap.className = '';
+    this._setVal(0);
+  },
+
+  error(label) {
+    this._init();
+    this._done = true;
+    clearInterval(this._timer);
+    this._wrap.className = 'prog-error';
+    this._pill.className = 'prog-error';
+    this._setVal(100);
+    if (label) this._lbl.textContent = '✕ ' + label;
+    setTimeout(() => {
+      this._wrap.style.display = 'none';
+      this._pill.style.display = 'none';
+      this._wrap.className = '';
+      this._setVal(0);
+    }, 1800);
+  },
+
+  _setVal(pct) {
+    pct = Math.min(Math.round(pct), 100);
+    this._fill.style.width = pct + '%';
+    this._pct.textContent  = pct + '%';
+  }
+};
+
+// ───────────────────────────────────────────────
+// STATE
+// ───────────────────────────────────────────────
+let allBahan   = [];   // master ingredient list
+let allProduk  = [];   // all products
+let ssUrl      = '#';
+let deleteCtx  = null; // { type:'bahan'|'produk', id }
+let rowCount   = 0;
+let _pendingBahanRowId = null; // rowId yang menunggu bahan baru dari modal
+
+// ───────────────────────────────────────────────
+// NAVIGATION
+// ───────────────────────────────────────────────
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.removeAttribute('aria-current'));
+  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-current','page'); }
+  const activePage = document.getElementById('page-' + name);
+  activePage.setAttribute('tabindex','-1');
+  activePage.focus({preventScroll:true});
+  history.replaceState(null, '', '#' + name);
+
+  if (name === 'dashboard')     loadDashboard();
+  if (name === 'bahan')         loadBahan();
+  if (name === 'inputProduk')   loadBahanForForm();
+  if (name === 'bundling')      initBundlingPage();
+  if (name === 'prep')          loadPrep();
+  if (name === 'produk')        loadProduk();
+}
+
+// ───────────────────────────────────────────────
+// DASHBOARD
+// ───────────────────────────────────────────────
+function loadDashboard() {
+  _prog.start('Memuat Dashboard');
+  gasRun()
+    .withSuccessHandler(onDashboard)
+    .withFailureHandler(onFail)
+    .getDashboard();
+}
+
+function onDashboard(data) {
+  if (!data || data._error) {
+    _prog.error('Gagal memuat');
+    console.error('getDashboard error:', data && data._error);
+    return;
+  }
+  _prog.complete('Dashboard Siap');
+  setSSUrl(data.ssUrl);
+  document.getElementById('d-produk').textContent  = data.totalProduk;
+  document.getElementById('d-bahan').textContent   = data.totalBahan;
+  document.getElementById('d-margin').textContent  = data.avgMargin + '%';
+
+  const topEl = document.getElementById('d-topProfit');
+  if (!data.topProfit || data.topProfit.length === 0) {
+    topEl.innerHTML = '<p style="color:var(--muted);font-size:13px;font-style:italic">Belum ada produk.</p>';
+  } else {
+    topEl.innerHTML = data.topProfit.map(p => `
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span>${p.nama}</span>
+        <span style="color:var(--green);font-weight:500">${p.margin}%</span>
+      </div>`).join('');
+  }
+
+  const lowEl = document.getElementById('d-lowMargin');
+  if (!data.lowMargin || data.lowMargin.length === 0) {
+    lowEl.innerHTML = '<p style="color:var(--green);font-size:13px">✓ Semua produk margin aman.</p>';
+  } else {
+    lowEl.innerHTML = '<ul class="warn-list">' +
+      data.lowMargin.map(p => `<li>${p.nama} — margin ${p.margin}%</li>`).join('') + '</ul>';
+  }
+}
+
+// ───────────────────────────────────────────────
+// BAHAN BAKU
+// ───────────────────────────────────────────────
+function loadBahan() {
+  document.getElementById('bahanBody').innerHTML = '<tr><td colspan="6" class="loading">Memuat…</td></tr>';
+  _prog.start('Memuat Bahan Baku');
+  gasRun()
+    .withSuccessHandler(onBahan)
+    .withFailureHandler(onFail)
+    .getBahanBaku();
+}
+
+function onBahan(data) {
+  if (!data || data._error) {
+    _prog.error('Gagal memuat');
+    showAlert('alert-bahan', 'Gagal memuat data: ' + (data && data._error || 'server error'), 'error');
+    document.getElementById('bahanBody').innerHTML =
+      '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:24px">Gagal memuat. Klik Refresh untuk coba lagi.</td></tr>';
+    return;
+  }
+  _prog.complete('Bahan Baku Dimuat');
+  setSSUrl(data.ssUrl);
+  allBahan = data.items || [];
+  renderBahan(allBahan);
+}
+
+function renderBahan(items) {
+  const tbody = document.getElementById('bahanBody');
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-style:italic">Belum ada bahan baku.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(b => `
+    <tr>
+      <td><strong>${esc(b.nama)}</strong></td>
+      <td>${esc(b.satuan)}</td>
+      <td class="num">${fmt(b.harga)}</td>
+      <td><span class="badge badge-amber">${esc(b.kategori)}</span></td>
+      <td style="color:var(--muted);font-size:12px">${esc(b.updated)}</td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-ghost" onclick="editBahan('${b.id}')">Edit</button>
+        <button class="btn btn-danger" onclick="openDelete('bahan','${b.id}','${esc(b.nama)}')">✕</button>
+      </td>
+    </tr>`).join('');
+}
+
+function refreshBahan() {
+  clearHppReadCache();
+  const btn = document.getElementById('btnRefreshBahan');
+  btn.disabled = true;
+  btn.textContent = '↺ Memuat…';
+  allBahan = [];
+  _prog.start('Refresh Bahan Baku');
+  gasRun()
+    .withSuccessHandler(data => {
+      btn.disabled = false;
+      btn.textContent = '↺ Refresh';
+      _prog.complete('Refresh Selesai');
+      setSSUrl(data.ssUrl);
+      allBahan = data.items;
+      renderBahan(allBahan);
+      showAlert('alert-bahan', `${allBahan.length} bahan baku berhasil dimuat ulang.`, 'success');
+      syncRecipeRowsWithMaster();
+    })
+    .withFailureHandler(err => {
+      btn.disabled = false;
+      btn.textContent = '↺ Refresh';
+      _prog.error('Refresh Gagal');
+      onFail(err);
+    })
+    .getBahanBaku();
+}
+
+function syncRecipeRowsWithMaster() {
+  const rows = document.getElementById('recipeRows');
+  if (!rows) return;
+  Array.from(rows.children).forEach(row => {
+    const bahanId = row.querySelector('.ing-bahanId').value;
+    if (!bahanId) return;
+    const master = allBahan.find(b => b.id === bahanId);
+    if (!master) return;
+    // Update satuan and harga from latest master data
+    row.querySelector('.ing-satuan').value = master.satuan;
+    row.querySelector('.ing-harga').value  = master.harga;
+  });
+  recalcHPP();
+}
+
+
+function filterBahan(q) {
+  const f = q.toLowerCase();
+  renderBahan(allBahan.filter(b => b.nama.toLowerCase().includes(f) || b.kategori.toLowerCase().includes(f)));
+}
+
+function openBahanModal(prefill) {
+  _pendingBahanRowId = _pendingBahanRowId; // jaga jika diset sebelumnya oleh selectNewBahan
+  document.getElementById('bahanModal').classList.add('open');
+  _openAccessibleModal('bahanModal', 'm-nama');
+  document.getElementById('bahanModalTitle').textContent = 'Tambah Bahan Baku';
+  document.getElementById('m-bahanId').value    = '';
+  document.getElementById('m-nama').value       = prefill || '';
+  document.getElementById('m-satuan').value     = '';
+  document.getElementById('m-harga').value      = '';
+  document.getElementById('m-kategori').value   = 'Lainnya';
+  document.getElementById('m-qty-beli').value   = '';
+  document.getElementById('m-total-harga').value= '';
+  const prev = document.getElementById('calc-preview');
+  if (prev) prev.textContent = '';
+}
+
+function closeBahanModal() {
+  document.getElementById('bahanModal').classList.remove('open');
+  _closeAccessibleModal('bahanModal');
+  _pendingBahanRowId = null; // clear pending saat modal ditutup tanpa simpan
+}
+
+function editBahan(id) {
+  _pendingBahanRowId = null; // edit tidak dari ingredient row
+  const b = allBahan.find(x => x.id === id);
+  if (!b) return;
+  document.getElementById('bahanModal').classList.add('open');
+  _openAccessibleModal('bahanModal', 'm-nama');
+  document.getElementById('bahanModalTitle').textContent = 'Edit Bahan Baku';
+  document.getElementById('m-bahanId').value   = b.id;
+  document.getElementById('m-nama').value      = b.nama;
+  document.getElementById('m-satuan').value    = b.satuan;
+  document.getElementById('m-harga').value     = b.harga;
+  document.getElementById('m-kategori').value  = b.kategori;
+}
+
+function submitBahanModal() {
+  const nama   = document.getElementById('m-nama').value.trim();
+  const satuan = document.getElementById('m-satuan').value;
+  const harga  = parseFloat(document.getElementById('m-harga').value) || 0;
+  const kat    = document.getElementById('m-kategori').value;
+  const isUpdate = !!document.getElementById('m-bahanId').value;
+
+  if (!nama || !satuan || !harga) {
+    alert('Nama, satuan, dan harga wajib diisi.'); return;
+  }
+
+  const data = {
+    id: document.getElementById('m-bahanId').value || null,
+    nama, satuan, harga, kategori: kat
+  };
+
+  _prog.start(isUpdate ? 'Memperbarui Harga…' : 'Menyimpan Bahan…');
+  gasRun()
+    .withSuccessHandler(res => {
+      if (res && res.success) {
+        _prog.complete('Bahan Disimpan');
+        closeBahanModal();
+
+        // Tambah ke cache lokal
+        if (!isUpdate) {
+          allBahan.push({ id: res.id, nama, satuan, harga, kategori: kat, updated: '' });
+        }
+
+        // ── Auto-isi baris ingredien yang sedang menunggu ──
+        if (_pendingBahanRowId && !isUpdate) {
+          const pendingId = _pendingBahanRowId;
+          _pendingBahanRowId = null;
+          selectBahan(pendingId, res.id, nama, satuan, harga);
+          // Tidak perlu reload halaman bahan — cukup update cache
+        } else {
+          _pendingBahanRowId = null;
+          allBahan  = [];
+          allProduk = [];
+          allPreps  = [];
+          loadBahan();
+        }
+
+        const msg = isUpdate
+          ? `Harga diperbarui — produk & preparation terkait otomatis terupdate.`
+          : `Bahan "${nama}" berhasil ditambahkan dan langsung digunakan.`;
+        showAlert('alert-bahan', msg, 'success');
+      } else {
+        _prog.error('Gagal Menyimpan');
+        alert((res && res.error) || 'Terjadi kesalahan.');
+      }
+    })
+    .withFailureHandler(err => { _prog.error('Error'); onFail(err); })
+    .saveBahanBaku(data);
+}
+
+// ───────────────────────────────────────────────
+// INPUT PRODUK
+// ───────────────────────────────────────────────
+function loadBahanForForm() {
+  if (allBahan.length === 0) {
+    gasRun()
+      .withSuccessHandler(d => { allBahan = d.items; })
+      .withFailureHandler(onFail)
+      .getBahanBaku();
+  }
+  if (document.getElementById('recipeRows').children.length === 0) {
+    addIngredientRow();
+  }
+}
+
+function addIngredientRow() {
+  rowCount++;
+  const id = 'row-' + rowCount;
+  const row = document.createElement('div');
+  row.id = id;
+  row.className = 'recipe-row';
+  row.innerHTML = `
+    <div class="form-group ac-wrap">
+      <label style="font-size:9px">Nama Bahan</label>
+      <input class="ing-nama" placeholder="Ketik nama bahan…"
+             oninput="acSearch(this,'${id}')" onfocus="acSearch(this,'${id}')"
+             onkeydown="_ddKey(event,'ac-${id}')"
+             autocomplete="off">
+      <div class="ac-dropdown" id="ac-${id}"></div>
+      <input type="hidden" class="ing-bahanId">
+    </div>
+    <div class="form-group">
+      <label style="font-size:9px" id="lbl-satuan-${id}">
+        Satuan
+        <span class="field-lock" id="lock-satuan-${id}" title="Otomatis dari master bahan baku" style="display:none">🔒</span>
+      </label>
+      <input class="ing-satuan" placeholder="gram" id="satuan-${id}">
+    </div>
+    <div class="form-group">
+      <label style="font-size:9px" id="lbl-harga-${id}">
+        Harga/Satuan
+        <span class="field-lock" id="lock-harga-${id}" title="Otomatis dari master bahan baku" style="display:none">🔒</span>
+      </label>
+      <input class="ing-harga" type="number" placeholder="0" id="harga-${id}" oninput="recalcHPP()">
+    </div>
+    <div class="form-group">
+      <label style="font-size:9px">Jumlah</label>
+      <input class="ing-jumlah" type="number" placeholder="0" oninput="recalcHPP()">
+    </div>
+    <button class="recipe-del" onclick="removeRow('${id}')">×</button>`;
+  document.getElementById('recipeRows').appendChild(row);
+
+  document.addEventListener('click', function closeAC(e) {
+    if (!row.contains(e.target)) {
+      const dd = document.getElementById('ac-' + id);
+      if (dd) dd.classList.remove('open');
+    }
+  });
+}
+
+function removeRow(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+  recalcHPP();
+}
+
+function acSearch(input, rowId) {
+  const q   = input.value.toLowerCase().trim();
+  const dd  = document.getElementById('ac-' + rowId);
+  const row = document.getElementById(rowId);
+
+  // If user cleared the field, reset lock
+  if (!input.value.trim()) {
+    row.querySelector('.ing-bahanId').value = '';
+    _unlockRow(rowId);
+    row.querySelector('.ing-satuan').value = '';
+    row.querySelector('.ing-harga').value  = '';
+    recalcHPP();
+  }
+
+  let filtered = allBahan.filter(b => b.nama.toLowerCase().includes(q));
+  if (filtered.length === 0 && q.length === 0) filtered = allBahan.slice(0, 8);
+
+  let html = filtered.slice(0, 8).map(b =>
+    `<div class="ac-item" onclick="selectBahan('${rowId}','${b.id}','${esc(b.nama)}','${esc(b.satuan)}',${b.harga})">
+       <span>${esc(b.nama)} <span style="font-size:11px;color:var(--muted);">(${esc(b.satuan)})</span></span>
+       <span class="ac-item-price">${fmt(b.harga)}</span>
+     </div>`).join('');
+
+  if (q && !allBahan.some(b => b.nama.toLowerCase() === q)) {
+    html += `<div class="ac-item ac-item-new" onclick="selectNewBahan('${rowId}','${input.value.trim()}')">
+               + Tambah "<strong>${esc(input.value.trim())}</strong>" sebagai bahan baru
+             </div>`;
+  }
+
+  dd.innerHTML = html;
+  dd.classList.toggle('open', html.length > 0);
+}
+
+function selectBahan(rowId, id, nama, satuan, harga) {
+  const row = document.getElementById(rowId);
+  row.querySelector('.ing-nama').value    = nama;
+  row.querySelector('.ing-bahanId').value = id;
+
+  // Auto-fill & lock satuan
+  const satuanEl = row.querySelector('.ing-satuan');
+  satuanEl.value    = satuan;
+  satuanEl.readOnly = true;
+  satuanEl.style.background   = 'var(--cream)';
+  satuanEl.style.color        = 'var(--muted)';
+  satuanEl.style.borderColor  = 'var(--sand)';
+  satuanEl.title = 'Satuan otomatis dari master bahan baku. Edit di menu Bahan Baku.';
+  const lockSatuan = document.getElementById('lock-satuan-' + rowId);
+  if (lockSatuan) lockSatuan.style.display = 'inline';
+
+  // Auto-fill & lock harga
+  const hargaEl = row.querySelector('.ing-harga');
+  hargaEl.value    = harga;
+  hargaEl.readOnly = true;
+  hargaEl.style.background   = 'var(--cream)';
+  hargaEl.style.color        = 'var(--muted)';
+  hargaEl.style.borderColor  = 'var(--sand)';
+  hargaEl.title = 'Harga otomatis dari master bahan baku. Edit di menu Bahan Baku.';
+  const lockHarga = document.getElementById('lock-harga-' + rowId);
+  if (lockHarga) lockHarga.style.display = 'inline';
+
+  document.getElementById('ac-' + rowId).classList.remove('open');
+  row.querySelector('.ing-jumlah').focus();
+  recalcHPP();
+}
+
+function selectNewBahan(rowId, nama) {
+  const row = document.getElementById(rowId);
+  document.getElementById('ac-' + rowId).classList.remove('open');
+  row.querySelector('.ing-nama').value    = nama;
+  row.querySelector('.ing-bahanId').value = '';
+  _unlockRow(rowId);
+
+  if (rowId.startsWith('prow-')) {
+    // Preparation form — tampilkan inline form
+    showInlineBahanForm(rowId, nama);
+  } else {
+    // Product form — buka modal, simpan rowId agar bisa auto-isi setelah simpan
+    _pendingBahanRowId = rowId;
+    openBahanModal(nama);
+  }
+}
+
+function _unlockRow(rowId) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+
+  const satuanEl = row.querySelector('.ing-satuan');
+  satuanEl.readOnly = false;
+  satuanEl.style.background  = '';
+  satuanEl.style.color       = '';
+  satuanEl.style.borderColor = '';
+  satuanEl.title = '';
+  const lockSatuan = document.getElementById('lock-satuan-' + rowId);
+  if (lockSatuan) lockSatuan.style.display = 'none';
+
+  const hargaEl = row.querySelector('.ing-harga');
+  hargaEl.readOnly = false;
+  hargaEl.style.background  = '';
+  hargaEl.style.color       = '';
+  hargaEl.style.borderColor = '';
+  hargaEl.title = '';
+  const lockHarga = document.getElementById('lock-harga-' + rowId);
+  if (lockHarga) lockHarga.style.display = 'none';
+}
+
+function getRecipeRows() {
+  return Array.from(document.getElementById('recipeRows').children).map(row => ({
+    bahanId:   row.querySelector('.ing-bahanId').value || null,
+    namaBahan: row.querySelector('.ing-nama').value.trim(),
+    satuan:    row.querySelector('.ing-satuan').value.trim(),
+    harga:     parseFloat(row.querySelector('.ing-harga').value) || 0,
+    jumlah:    parseFloat(row.querySelector('.ing-jumlah').value) || 0
+  })).filter(r => r.namaBahan);
+}
+
+function recalcHPP() {
+  const rows       = getRecipeRows();
+  const hargaJual  = parseFloat(document.getElementById('f-hargaJual').value)  || 0;
+  const overheadPct= parseFloat(document.getElementById('f-overhead').value)   || 0;
+  const box        = document.getElementById('hppBox');
+
+  if (rows.length === 0) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+
+  // Bahan detail rows
+  let hppBahan = 0;
+  let detail = rows.map(r => {
+    const sub = r.jumlah * r.harga;
+    hppBahan += sub;
+    return `<div class="hpp-row"><span>${esc(r.namaBahan)} (${r.jumlah} ${esc(r.satuan)})</span><span>Rp ${fmtNum(sub)}</span></div>`;
+  }).join('');
+
+  document.getElementById('hpp-detail').innerHTML = detail;
+  document.getElementById('hpp-bahan').textContent = 'Rp ' + fmtNum(hppBahan);
+
+  // Overhead
+  const overheadNom = hppBahan * overheadPct / 100;
+  const hppTotal    = hppBahan + overheadNom;
+  const overheadRow = document.getElementById('hpp-overhead-row');
+
+  if (overheadPct > 0) {
+    overheadRow.style.display = 'flex';
+    document.getElementById('hpp-overhead-label').textContent = `Overhead (${overheadPct}%)`;
+    document.getElementById('hpp-overhead-val').textContent   = 'Rp ' + fmtNum(overheadNom);
+  } else {
+    overheadRow.style.display = 'none';
+  }
+
+  document.getElementById('hpp-total').textContent = 'Rp ' + fmtNum(hppTotal);
+
+  // Margin
+  if (hargaJual > 0) {
+    const m   = (hargaJual - hppTotal) / hargaJual * 100;
+    const mN  = hargaJual - hppTotal;
+    const cls = m >= 60 ? 'color:var(--green)' : m >= 50 ? 'color:var(--gold)' : 'color:var(--red)';
+    document.getElementById('hpp-margin').innerHTML =
+      `<span style="${cls};font-weight:500">${Math.round(m*10)/10}%</span> &nbsp;(Rp ${fmtNum(mN)})`;
+  } else {
+    document.getElementById('hpp-margin').textContent = '— (isi harga jual)';
+  }
+}
+
+function saveProduk() {
+  const nama     = document.getElementById('f-nama').value.trim();
+  const kategori = document.getElementById('f-kategori').value;
+  const hargaJual = parseFloat(document.getElementById('f-hargaJual').value) || 0;
+  const bahan    = getRecipeRows();
+  const editId   = document.getElementById('editProdukId').value || null;
+
+  const overheadPct = parseFloat(document.getElementById('f-overhead').value) || 0;
+
+  if (!nama)     { showAlert('alert-produk','Nama produk wajib diisi.','error'); return; }
+  if (!kategori) { showAlert('alert-produk','Pilih kategori menu.','error'); return; }
+  if (!hargaJual){ showAlert('alert-produk','Harga jual wajib diisi.','error'); return; }
+  if (bahan.length === 0) { showAlert('alert-produk','Tambahkan minimal 1 bahan baku.','error'); return; }
+
+  const invalid = bahan.find(b => !b.satuan || !b.harga || !b.jumlah);
+  if (invalid) { showAlert('alert-produk','Lengkapi satuan, harga, dan jumlah semua bahan.','error'); return; }
+
+  const btn = document.getElementById('btnSaveProduk');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan…';
+  _prog.start('Menyimpan Produk');
+
+  gasRun()
+    .withSuccessHandler(res => {
+      btn.disabled = false;
+      btn.textContent = 'Simpan Produk';
+      if (res && res.success) {
+        _prog.complete('Produk Disimpan');
+        const overMsg = res.overheadPct > 0
+          ? ` | Overhead ${res.overheadPct}%: Rp ${fmtNum(res.overheadNom)} | HPP Total: Rp ${fmtNum(res.hppTotal)}`
+          : ` | HPP: Rp ${fmtNum(res.hppBahan)}`;
+        showAlert('alert-produk', `Produk berhasil disimpan.${overMsg} | Margin: ${res.margin}%`, 'success');
+        if (res.id) _clearResepCache(res.id);
+        resetProdukForm();
+        allBahan = [];
+        // Refresh data produk di background dengan progress bar
+        _prog.start('Memperbarui Data Produk…');
+        gasRun()
+          .withSuccessHandler(data => {
+            if (data && !data._error) {
+              allProduk = data.items || [];
+              _populateKategoriFilter(allProduk);
+              _prog.complete('Data Diperbarui');
+              if (document.getElementById('page-produk').classList.contains('active')) {
+                renderProduk(allProduk);
+              }
+            } else {
+              _prog.error('Gagal Memperbarui');
+              allProduk = [];
+            }
+          })
+          .withFailureHandler(() => { _prog.error('Gagal Memperbarui'); allProduk = []; })
+          .getProduk();
+      } else {
+        _prog.error('Gagal Menyimpan');
+        showAlert('alert-produk', (res && res.error) || 'Terjadi kesalahan.', 'error');
+      }
+    })
+    .withFailureHandler(err => {
+      btn.disabled = false;
+      btn.textContent = 'Simpan Produk';
+      _prog.error('Error');
+      showAlert('alert-produk', 'Error: ' + err.message, 'error');
+    })
+    .saveProduk({ id: editId, nama, kategori, hargaJual, overheadPct, bahan });
+}
+
+function setOverhead(pct) {
+  document.getElementById('f-overhead').value = pct;
+  recalcHPP();
+}
+
+function resetProdukForm() {
+  document.getElementById('editProdukId').value = '';
+  document.getElementById('f-nama').value       = '';
+  document.getElementById('f-kategori').value   = '';
+  document.getElementById('f-hargaJual').value  = '';
+  document.getElementById('f-overhead').value   = '';
+  document.getElementById('recipeRows').innerHTML = '';
+  document.getElementById('hppBox').style.display = 'none';
+  document.getElementById('formProdukTitle').innerHTML = 'Input <em>Produk Baru</em>';
+  rowCount = 0;
+  addIngredientRow();
+}
+
+// ───────────────────────────────────────────────
+// SEMUA PRODUK
+// ───────────────────────────────────────────────
+function loadProduk() {
+  document.getElementById('produkBody').innerHTML = '<tr><td colspan="8" class="loading">Memuat…</td></tr>';
+  _prog.start('Memuat Produk');
+  gasRun()
+    .withSuccessHandler(onProduk)
+    .withFailureHandler(err => { _prog.error('Gagal Memuat'); onFail(err); })
+    .getProduk();
+}
+
+function onProduk(data) {
+  if (!data || data._error) {
+    _prog.error('Gagal Memuat');
+    showAlert('alert-semua', 'Gagal memuat data: ' + (data && data._error || 'server error'), 'error');
+    document.getElementById('produkBody').innerHTML =
+      '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:24px">Gagal memuat. Klik Refresh untuk coba lagi.</td></tr>';
+    return;
+  }
+  _prog.complete('Produk Dimuat');
+  setSSUrl(data.ssUrl);
+  allProduk = data.items || [];
+  _populateKategoriFilter(allProduk);
+  renderProduk(allProduk);
+}
+
+function renderProduk(items) {
+  const tbody = document.getElementById('produkBody');
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:32px;font-style:italic">Belum ada produk.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(p => {
+    const mClass = p.marginPct >= 60 ? 'badge-green' : p.marginPct >= 50 ? 'badge-amber' : 'badge-red';
+    const overheadCell = p.overheadPct > 0
+      ? `<span class="badge badge-amber">${p.overheadPct}%</span> <span style="font-size:11px;color:var(--muted)">(${fmt(p.overheadNom)})</span>`
+      : `<span style="color:var(--muted);font-size:12px">—</span>`;
+    return `
+    <tr id="prod-row-${p.id}" style="cursor:pointer" onclick="toggleResep('${p.id}', this)">
+      <td style="text-align:center;padding:10px 6px">
+        <span id="chevron-${p.id}" style="font-size:11px;color:var(--caramel);
+              display:inline-block;transition:transform .2s">▶</span>
+      </td>
+      <td><strong>${esc(p.nama)}</strong></td>
+      <td><span class="badge badge-amber">${esc(p.kategori)}</span></td>
+      <td class="num">${fmt(p.hargaJual)}</td>
+      <td class="num">${fmt(p.hppBahan)}</td>
+      <td class="num">${overheadCell}</td>
+      <td class="num"><strong>${fmt(p.hppTotal)}</strong></td>
+      <td class="num"><span class="badge ${mClass}">${p.marginPct}%</span></td>
+      <td class="num">${fmt(p.marginNominal)}</td>
+      <td style="color:var(--muted);font-size:12px">${esc(p.tanggal)}</td>
+      <td style="display:flex;gap:4px" onclick="event.stopPropagation()">
+        <button class="btn btn-ghost" onclick="editProduk('${p.id}')">Edit</button>
+        <button class="btn btn-danger" onclick="openDelete('produk','${p.id}','${esc(p.nama)}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function applyProdukFilter() {
+  const q      = (document.getElementById('search-produk').value || '').toLowerCase();
+  const kat    = document.getElementById('filter-kat-produk').value;
+  const margin = document.getElementById('filter-margin-produk').value;
+  const sort   = document.getElementById('sort-produk').value;
+
+  let items = allProduk.filter(p => {
+    // Text search
+    if (q && !p.nama.toLowerCase().includes(q) && !p.kategori.toLowerCase().includes(q)) return false;
+    // Kategori filter
+    if (kat && p.kategori !== kat) return false;
+    // Margin filter
+    if (margin === 'good' && p.marginPct < 60)  return false;
+    if (margin === 'warn' && (p.marginPct < 50 || p.marginPct >= 60)) return false;
+    if (margin === 'bad'  && p.marginPct >= 50) return false;
+    return true;
+  });
+
+  // Sort
+  if (sort === 'margin-desc') items = [...items].sort((a,b) => b.marginPct - a.marginPct);
+  if (sort === 'margin-asc')  items = [...items].sort((a,b) => a.marginPct - b.marginPct);
+  if (sort === 'hpp-desc')    items = [...items].sort((a,b) => b.hppTotal - a.hppTotal);
+  if (sort === 'hpp-asc')     items = [...items].sort((a,b) => a.hppTotal - b.hppTotal);
+  if (sort === 'nama-asc')    items = [...items].sort((a,b) => a.nama.localeCompare(b.nama));
+  if (sort === 'nama-desc')   items = [...items].sort((a,b) => b.nama.localeCompare(a.nama));
+
+  renderProduk(items);
+}
+
+// Alias untuk backward compat
+function filterProduk(q) { applyProdukFilter(); }
+
+function resetProdukFilter() {
+  document.getElementById('search-produk').value      = '';
+  document.getElementById('filter-kat-produk').value  = '';
+  document.getElementById('filter-margin-produk').value = '';
+  document.getElementById('sort-produk').value        = '';
+  renderProduk(allProduk);
+}
+
+function _populateKategoriFilter(items) {
+  const sel = document.getElementById('filter-kat-produk');
+  const cur = sel.value;
+  const cats = [...new Set(items.map(p => p.kategori).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Semua Kategori</option>' +
+    cats.map(c => `<option value="${esc(c)}"${c===cur?' selected':''}>${esc(c)}</option>`).join('');
+}
+
+function editProduk(id) {
+  _prog.start('Memuat Data Produk');
+  gasRun()
+    .withSuccessHandler(resep => {
+      const p = allProduk.find(x => x.id === id);
+      if (!p) { _prog.error('Produk tidak ditemukan'); return; }
+      _prog.complete('Data Siap');
+      showPage('inputProduk');
+      document.querySelector('.nav-btn:nth-child(3)').classList.add('active');
+      document.querySelector('.nav-btn:nth-child(4)').classList.remove('active');
+
+      document.getElementById('editProdukId').value = id;
+      document.getElementById('f-nama').value       = p.nama;
+      document.getElementById('f-kategori').value   = p.kategori;
+      document.getElementById('f-hargaJual').value  = p.hargaJual;
+      document.getElementById('f-overhead').value   = p.overheadPct || '';
+      document.getElementById('formProdukTitle').innerHTML = 'Edit <em>Produk</em>';
+
+      // Populate recipe rows
+      document.getElementById('recipeRows').innerHTML = '';
+      rowCount = 0;
+      resep.forEach(r => {
+        addIngredientRow();
+        const row   = document.getElementById('recipeRows').lastElementChild;
+        const rowId = row.id;
+        row.querySelector('.ing-nama').value    = r.namaBahan;
+        row.querySelector('.ing-bahanId').value = r.bahanId;
+        row.querySelector('.ing-jumlah').value  = r.jumlah;
+
+        if (r.bahanId) {
+          // Existing ingredient — auto-fill & lock
+          selectBahan(rowId, r.bahanId, r.namaBahan, r.satuan, r.hargaSatuan);
+        } else {
+          // New ingredient (no master ID) — editable
+          row.querySelector('.ing-satuan').value = r.satuan;
+          row.querySelector('.ing-harga').value  = r.hargaSatuan;
+          _unlockRow(rowId);
+        }
+      });
+      if (resep.length === 0) addIngredientRow();
+      recalcHPP();
+    })
+    .withFailureHandler(err => { _prog.error('Gagal Memuat'); onFail(err); })
+    .getResepByProduk(id);
+}
+// ───────────────────────────────────────────────
+function openDelete(type, id, nama) {
+  deleteCtx = { type, id };
+  document.getElementById('deleteMsg').textContent = `Hapus "${nama}"? Tindakan ini tidak dapat dibatalkan.`;
+  document.getElementById('deleteModal').classList.add('open');
+  _openAccessibleModal('deleteModal');
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.remove('open');
+  _closeAccessibleModal('deleteModal');
+  deleteCtx = null;
+}
+
+function confirmDelete() {
+  if (!deleteCtx) return;
+  const { type, id } = deleteCtx;
+  closeDeleteModal();
+  _prog.start('Menghapus Data');
+
+  if (type === 'bahan') {
+    gasRun()
+      .withSuccessHandler(res => {
+        if (res && res.success) { _prog.complete('Bahan Dihapus'); loadBahan(); showAlert('alert-bahan','Bahan dihapus.','success'); }
+        else { _prog.error('Gagal'); alert(res.error); }
+      }).withFailureHandler(err => { _prog.error('Error'); onFail(err); }).deleteBahanBaku(id);
+  } else if (type === 'prep') {
+    gasRun()
+      .withSuccessHandler(res => {
+        if (res && res.success) { _prog.complete('Preparation Dihapus'); loadPrep(); showAlert('alert-prep','Preparation dihapus.','success'); }
+        else { _prog.error('Gagal'); alert(res.error); }
+      }).withFailureHandler(err => { _prog.error('Error'); onFail(err); }).deletePreparation(id);
+  } else {
+    gasRun()
+      .withSuccessHandler(res => {
+        if (res && res.success) { _prog.complete('Produk Dihapus'); _clearResepCache(id); loadProduk(); showAlert('alert-semua','Produk dihapus.','success'); }
+        else { _prog.error('Gagal'); alert(res.error); }
+      }).withFailureHandler(err => { _prog.error('Error'); onFail(err); }).deleteProduk(id);
+  }
+}
+
+// ───────────────────────────────────────────────
+// UTILS
+// ───────────────────────────────────────────────
+function setSSUrl(url) {
+  if (url) { ssUrl = url; document.getElementById('ssLink').href = url; }
+}
+
+function fmt(n)    { return 'Rp ' + fmtNum(n); }
+function fmtNum(n) { return (Number(n)||0).toLocaleString('id-ID'); }
+function esc(s)    { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showAlert(elId, msg, type) {
+  const el = document.getElementById(elId);
+  el.textContent = msg;
+  el.className   = 'alert alert-' + (type === 'success' ? 'success' : 'error') + ' show';
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+function onFail(err) {
+  console.error(err);
+  alert('Terjadi kesalahan. Coba lagi atau periksa koneksi.');
+}
+
+// ───────────────────────────────────────────────
+// COMBO INPUT ENGINE
+// ───────────────────────────────────────────────
+
+// Master lists — persisted across session in memory
+const MENU_CATEGORIES = [
+  'Coffee','Non Coffee','Nusantara','Main Course','Nasi Goreng',
+  'Pasta','Mie & Nasi Bowl','Cemilan & Sharing','Dessert & Cake',
+  'Pastry','Breakfast','Soup & Salad'
+];
+
+const BAHAN_CATEGORIES = [
+  'Protein','Sayuran','Bumbu','Minuman','Dairy',
+  'Tepung & Biji','Kemasan','Lainnya'
+];
+
+// Load persisted custom categories from localStorage
+function loadCustomCategories() {
+  try {
+    const mc = localStorage.getItem('restless_menu_cats');
+    const bc = localStorage.getItem('restless_bahan_cats');
+    if (mc) JSON.parse(mc).forEach(c => { if (!MENU_CATEGORIES.includes(c)) MENU_CATEGORIES.push(c); });
+    if (bc) JSON.parse(bc).forEach(c => { if (!BAHAN_CATEGORIES.includes(c)) BAHAN_CATEGORIES.push(c); });
+  } catch(e) {}
+}
+
+function saveCustomMenuCat(val) {
+  if (!MENU_CATEGORIES.includes(val)) {
+    MENU_CATEGORIES.push(val);
+    try { localStorage.setItem('restless_menu_cats', JSON.stringify(MENU_CATEGORIES)); } catch(e) {}
+  }
+}
+
+function saveCustomBahanCat(val) {
+  if (!BAHAN_CATEGORIES.includes(val)) {
+    BAHAN_CATEGORIES.push(val);
+    try { localStorage.setItem('restless_bahan_cats', JSON.stringify(BAHAN_CATEGORIES)); } catch(e) {}
+  }
+}
+
+function getListForDropdown(dropdownId) {
+  return dropdownId === 'komboMenu' ? MENU_CATEGORIES : BAHAN_CATEGORIES;
+}
+
+function getInputForDropdown(dropdownId) {
+  return dropdownId === 'komboMenu'
+    ? document.getElementById('f-kategori')
+    : document.getElementById('m-kategori');
+}
+
+function renderComboList(dropdownId, items, currentVal) {
+  const dd = document.getElementById(dropdownId);
+  if (!dd) return;
+
+  let html = items.map(item =>
+    `<div class="ac-item${item === currentVal ? ' active' : ''}"
+          onmousedown="comboSelect('${dropdownId}','${item.replace(/'/g,"\\'")}')">
+       ${esc(item)}
+     </div>`
+  ).join('');
+
+  // Offer to add as new if typed value not in list
+  const q = getInputForDropdown(dropdownId).value.trim();
+  if (q && !items.some(i => i.toLowerCase() === q.toLowerCase())) {
+    html += `<div class="ac-item ac-item-new"
+                  onmousedown="comboAddNew('${dropdownId}','${q.replace(/'/g,"\\'")}')">
+               + Tambah kategori baru: <strong>${esc(q)}</strong>
+               <span class="combo-new-tag">Baru</span>
+             </div>`;
+  }
+
+  dd.innerHTML = html;
+  dd.classList.toggle('open', html.length > 0);
+}
+
+function comboOpen(dropdownId) {
+  const list = getListForDropdown(dropdownId);
+  const val  = getInputForDropdown(dropdownId).value.trim().toLowerCase();
+  const filtered = val ? list.filter(i => i.toLowerCase().includes(val)) : list;
+  renderComboList(dropdownId, filtered, getInputForDropdown(dropdownId).value);
+}
+
+function comboFilter(dropdownId, val) {
+  const list = getListForDropdown(dropdownId);
+  const filtered = val ? list.filter(i => i.toLowerCase().includes(val.toLowerCase())) : list;
+  renderComboList(dropdownId, filtered, val);
+}
+
+function comboToggle(dropdownId) {
+  const dd  = document.getElementById(dropdownId);
+  const inp = getInputForDropdown(dropdownId);
+  if (dd.classList.contains('open')) {
+    dd.classList.remove('open');
+  } else {
+    inp.focus();
+    comboOpen(dropdownId);
+  }
+}
+
+function comboBlur(dropdownId) {
+  // Small delay to allow onmousedown to fire first
+  setTimeout(() => {
+    const dd = document.getElementById(dropdownId);
+    if (dd) dd.classList.remove('open');
+  }, 180);
+}
+
+function comboSelect(dropdownId, val) {
+  const inp = getInputForDropdown(dropdownId);
+  inp.value = val;
+  document.getElementById(dropdownId).classList.remove('open');
+  inp.focus();
+}
+
+function comboAddNew(dropdownId, val) {
+  if (!val.trim()) return;
+  if (dropdownId === 'komboMenu') saveCustomMenuCat(val.trim());
+  else saveCustomBahanCat(val.trim());
+  comboSelect(dropdownId, val.trim());
+}
+
+// ───────────────────────────────────────────────
+// KALKULATOR HARGA/SATUAN (modal bahan baku)
+// ───────────────────────────────────────────────
+function calcHargaSatuan() {
+  const qty   = parseFloat(document.getElementById('m-qty-beli').value)    || 0;
+  const total = parseFloat(document.getElementById('m-total-harga').value) || 0;
+  const prev  = document.getElementById('calc-preview');
+  if (qty > 0 && total > 0) {
+    const perSatuan = Math.round(total / qty * 1000) / 1000;
+    document.getElementById('m-harga').value = perSatuan;
+    const satuan = document.getElementById('m-satuan').value || 'satuan';
+    prev.innerHTML = `<span style="color:var(--caramel)">→ Rp ${fmtNum(perSatuan)} / ${satuan}</span>`;
+  } else {
+    prev.textContent = '';
+  }
+}
+
+// ───────────────────────────────────────────────
+// PREPARATION
+// ───────────────────────────────────────────────
+let allPreps = [];
+let prepRowCount = 0;
+
+function loadPrep() {
+  document.getElementById('prepBody').innerHTML =
+    '<tr><td colspan="7" class="loading">Memuat…</td></tr>';
+  if (allBahan.length === 0) {
+    gasRun().withSuccessHandler(d => { allBahan = d.items || []; }).withFailureHandler(()=>{}).getBahanBaku();
+  }
+  _prog.start('Memuat Preparation');
+  gasRun()
+    .withSuccessHandler(onPrep)
+    .withFailureHandler(err => { _prog.error('Gagal Memuat'); onFail(err); })
+    .getPreparations();
+}
+
+function onPrep(data) {
+  if (!data || data._error) {
+    _prog.error('Gagal Memuat');
+    document.getElementById('prepBody').innerHTML =
+      '<tr><td colspan="7" style="color:var(--red);padding:20px;text-align:center">Gagal memuat. Coba Refresh.</td></tr>';
+    return;
+  }
+  _prog.complete('Preparation Dimuat');
+  allPreps = data.items || [];
+  renderPreps(allPreps);
+}
+
+function renderPreps(items) {
+  const tbody = document.getElementById('prepBody');
+  if (items.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-style:italic">Belum ada preparation.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(p => `
+    <tr>
+      <td><strong>${esc(p.nama)}</strong></td>
+      <td>${esc(p.satuanHasil)}</td>
+      <td class="num">${fmtNum(p.yield)}</td>
+      <td class="num">${fmt(p.hppTotal)}</td>
+      <td class="num"><strong>${fmt(p.hppPerSatuan)}</strong></td>
+      <td style="color:var(--muted);font-size:12px">${esc(p.tanggal)}</td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-ghost" onclick="editPrep('${p.id}')">Edit</button>
+        <button class="btn btn-danger" onclick="openDelete('prep','${p.id}','${esc(p.nama)}')">✕</button>
+      </td>
+    </tr>`).join('');
+}
+
+function addPrepIngRow() {
+  prepRowCount++;
+  const id  = 'prow-' + prepRowCount;
+  const row = document.createElement('div');
+  row.id = id;
+  row.className = 'recipe-row';
+  row.innerHTML = `
+    <div class="form-group ac-wrap">
+      <label style="font-size:9px">Nama Bahan</label>
+      <input class="ing-nama" placeholder="Ketik nama bahan…"
+             oninput="acSearch(this,'${id}')" onfocus="acSearch(this,'${id}')"
+             onkeydown="_ddKey(event,'ac-${id}')"
+             autocomplete="off">
+      <div class="ac-dropdown" id="ac-${id}"></div>
+      <input type="hidden" class="ing-bahanId">
+    </div>
+    <div class="form-group">
+      <label style="font-size:9px">Satuan
+        <span class="field-lock" id="lock-satuan-${id}" style="display:none">🔒</span>
+      </label>
+      <input class="ing-satuan" placeholder="gram" id="satuan-${id}">
+    </div>
+    <div class="form-group">
+      <label style="font-size:9px">Harga/Satuan
+        <span class="field-lock" id="lock-harga-${id}" style="display:none">🔒</span>
+      </label>
+      <input class="ing-harga" type="number" placeholder="0" id="harga-${id}" oninput="recalcPrep()">
+    </div>
+    <div class="form-group">
+      <label style="font-size:9px">Jumlah</label>
+      <input class="ing-jumlah" type="number" placeholder="0" oninput="recalcPrep()">
+    </div>
+    <button class="recipe-del" onclick="removePrepRow('${id}')">×</button>`;
+  document.getElementById('prepIngRows').appendChild(row);
+
+  document.addEventListener('click', function(e) {
+    if (!row.contains(e.target)) {
+      const dd = document.getElementById('ac-' + id);
+      if (dd) dd.classList.remove('open');
+    }
+  });
+}
+
+function removePrepRow(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+  recalcPrep();
+}
+
+function getPrepIngRows() {
+  return Array.from(document.getElementById('prepIngRows').children).map(row => ({
+    bahanId:   row.querySelector('.ing-bahanId').value || null,
+    namaBahan: row.querySelector('.ing-nama').value.trim(),
+    satuan:    row.querySelector('.ing-satuan').value.trim(),
+    harga:     parseFloat(row.querySelector('.ing-harga').value) || 0,
+    jumlah:    parseFloat(row.querySelector('.ing-jumlah').value) || 0
+  })).filter(r => r.namaBahan);
+}
+
+function recalcPrep() {
+  const rows    = getPrepIngRows();
+  const box     = document.getElementById('prepHppBox');
+  const yieldEl = document.getElementById('prep-yield');
+
+  // Auto-fill yield HANYA jika user belum override manual
+  if (!yieldEl._manualSet) {
+    const autoYield = rows.reduce((sum, r) => sum + (r.jumlah || 0), 0);
+    yieldEl.value = autoYield > 0 ? autoYield : '';
+  }
+
+  const yieldQ = parseFloat(yieldEl.value) || 0;
+  if (rows.length === 0) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+
+  let total = 0;
+  document.getElementById('prep-hpp-detail').innerHTML = rows.map(r => {
+    const sub = r.jumlah * r.harga;
+    total += sub;
+    return `<div class="hpp-row">
+      <span>${esc(r.namaBahan)} (${r.jumlah} ${esc(r.satuan)})</span>
+      <span>Rp ${fmtNum(sub)}</span>
+    </div>`;
+  }).join('');
+
+  const satuanHasil = document.getElementById('prep-satuan').value;
+  document.getElementById('prep-hpp-total').textContent = 'Rp ' + fmtNum(total);
+
+  if (yieldQ > 0) {
+    const perSatuan = Math.round(total / yieldQ * 1000) / 1000;
+    document.getElementById('prep-hpp-per-satuan').textContent =
+      'Rp ' + fmtNum(perSatuan) + (satuanHasil ? ' / ' + satuanHasil : '');
+  } else {
+    document.getElementById('prep-hpp-per-satuan').textContent = '— (tambahkan bahan)';
+  }
+}
+
+function onYieldManualInput() {
+  const yieldEl  = document.getElementById('prep-yield');
+  const resetBtn = document.getElementById('btn-yield-reset');
+  const hint     = document.getElementById('yield-hint');
+
+  yieldEl._manualSet = true;
+  resetBtn.style.display = 'block';
+  hint.innerHTML = '<span style="color:var(--muted)">Mode manual — klik ↺ untuk kembali ke otomatis</span>';
+  recalcPrep();
+}
+
+function resetYieldAuto() {
+  const yieldEl  = document.getElementById('prep-yield');
+  const resetBtn = document.getElementById('btn-yield-reset');
+  const hint     = document.getElementById('yield-hint');
+
+  yieldEl._manualSet = false;
+  resetBtn.style.display = 'none';
+  hint.textContent = 'Dihitung otomatis dari total jumlah bahan';
+  hint.style.color = 'var(--caramel)';
+  recalcPrep();
+}
+
+function savePrep() {
+  const nama       = document.getElementById('prep-nama').value.trim();
+  const satuanHasil= document.getElementById('prep-satuan').value;
+  const yieldQty   = parseFloat(document.getElementById('prep-yield').value) || 0;
+  const bahan      = getPrepIngRows();
+  const editId     = document.getElementById('edit-prep-id').value   || null;
+  const editBbId   = document.getElementById('edit-prep-bbid').value || null;
+
+  if (!nama)        { showAlert('alert-prep','Nama preparation wajib diisi.','error'); return; }
+  if (!satuanHasil) { showAlert('alert-prep','Pilih satuan hasil.','error'); return; }
+  if (!yieldQty)    { showAlert('alert-prep','Isi jumlah hasil (yield).','error'); return; }
+  if (bahan.length === 0) { showAlert('alert-prep','Tambahkan minimal 1 bahan.','error'); return; }
+
+  const btn = document.getElementById('btnSavePrep');
+  btn.disabled = true; btn.textContent = 'Menyimpan…';
+  _prog.start('Menyimpan Preparation');
+
+  gasRun()
+    .withSuccessHandler(res => {
+      btn.disabled = false; btn.textContent = 'Simpan Preparation';
+      if (res && res.success) {
+        _prog.complete('Preparation Disimpan');
+        allBahan  = [];
+        allProduk = [];
+        allPreps  = [];
+        showAlert('alert-prep',
+          `Preparation disimpan. HPP/Satuan: Rp ${fmtNum(res.hppPerSatuan)} / ${satuanHasil}` +
+          ` — produk & preparation terkait otomatis terupdate.`, 'success');
+        resetPrepForm();
+        loadPrep();
+      } else {
+        _prog.error('Gagal Menyimpan');
+        showAlert('alert-prep', (res && res.error) || 'Terjadi kesalahan.', 'error');
+      }
+    })
+    .withFailureHandler(err => {
+      btn.disabled = false; btn.textContent = 'Simpan Preparation';
+      _prog.error('Error');
+      showAlert('alert-prep', 'Error: ' + err.message, 'error');
+    })
+    .savePreparation({ id: editId, bahanBakuId: editBbId,
+                       nama, satuanHasil, yield: yieldQty, bahan });
+}
+
+function editPrep(id) {
+  _prog.start('Memuat Data Preparation');
+  gasRun()
+    .withSuccessHandler(detail => {
+      const p = allPreps.find(x => x.id === id);
+      if (!p) { _prog.error('Data tidak ditemukan'); return; }
+      _prog.complete('Data Siap');
+      document.getElementById('edit-prep-id').value   = id;
+      document.getElementById('edit-prep-bbid').value = p.bahanBakuId || '';
+      document.getElementById('prep-nama').value      = p.nama;
+      document.getElementById('prep-satuan').value    = p.satuanHasil;
+
+      // Set yield dari data tersimpan (manual mode)
+      const yieldEl  = document.getElementById('prep-yield');
+      const resetBtn = document.getElementById('btn-yield-reset');
+      const hint     = document.getElementById('yield-hint');
+      yieldEl.value      = p.yield;
+      yieldEl._manualSet = true;
+      if (resetBtn) resetBtn.style.display = 'block';
+      if (hint) { hint.innerHTML = '<span style="color:var(--muted)">Mode manual — klik ↺ untuk kembali ke otomatis</span>'; }
+
+      document.getElementById('prepIngRows').innerHTML = '';
+      prepRowCount = 0;
+      const rows = Array.isArray(detail) ? detail : [];
+      rows.forEach(r => {
+        addPrepIngRow();
+        const row = document.getElementById('prepIngRows').lastElementChild;
+        const rowId = row.id;
+        if (r.bahanId) {
+          selectBahan(rowId, r.bahanId, r.namaBahan, r.satuan, r.hargaSatuan);
+        } else {
+          row.querySelector('.ing-nama').value   = r.namaBahan;
+          row.querySelector('.ing-satuan').value = r.satuan;
+          row.querySelector('.ing-harga').value  = r.hargaSatuan;
+        }
+        row.querySelector('.ing-jumlah').value = r.jumlah;
+      });
+      if (rows.length === 0) addPrepIngRow();
+      recalcPrep();
+
+      // Scroll ke form
+      document.getElementById('page-prep').scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    })
+    .withFailureHandler(err => { _prog.error('Gagal Memuat'); onFail(err); })
+    .getPrepDetail(id);
+}
+
+function resetPrepForm() {
+  document.getElementById('edit-prep-id').value   = '';
+  document.getElementById('edit-prep-bbid').value = '';
+  document.getElementById('prep-nama').value      = '';
+  document.getElementById('prep-satuan').value    = '';
+  document.getElementById('prepIngRows').innerHTML = '';
+  document.getElementById('prepHppBox').style.display = 'none';
+
+  // Reset yield ke mode auto
+  const yieldEl = document.getElementById('prep-yield');
+  yieldEl.value = '';
+  yieldEl._manualSet = false;
+  const resetBtn = document.getElementById('btn-yield-reset');
+  const hint     = document.getElementById('yield-hint');
+  if (resetBtn) resetBtn.style.display = 'none';
+  if (hint) { hint.textContent = 'Dihitung otomatis dari total jumlah bahan'; hint.style.color = 'var(--caramel)'; }
+
+  const inlineForm = document.getElementById('inline-bahan-form');
+  if (inlineForm) inlineForm.remove();
+
+  prepRowCount = 0;
+  addPrepIngRow();
+}
+
+// ───────────────────────────────────────────────
+// INLINE BAHAN FORM (untuk Preparation)
+// ───────────────────────────────────────────────
+function showInlineBahanForm(rowId, prefillNama) {
+  // Hapus inline form yang sudah ada (satu form aktif sekaligus)
+  const existing = document.getElementById('inline-bahan-form');
+  if (existing) existing.remove();
+
+  const row  = document.getElementById(rowId);
+  const form = document.createElement('div');
+  form.id = 'inline-bahan-form';
+  form.dataset.rowId = rowId;
+  form.style.cssText = [
+    'background:var(--white)',
+    'border:1px solid var(--caramel)',
+    'border-left:3px solid var(--caramel)',
+    'padding:16px 18px',
+    'margin-bottom:6px'
+  ].join(';');
+
+  form.innerHTML = `
+    <div style="font-size:9px;letter-spacing:4px;text-transform:uppercase;
+                color:var(--caramel);margin-bottom:10px;font-weight:500">
+      ✦ Tambah Bahan Baru ke Master Bahan Baku
+    </div>
+    <div style="font-size:14px;font-weight:500;color:var(--brown);
+                margin-bottom:12px;font-family:'Cormorant Garamond',serif">
+      ${esc(prefillNama)}
+    </div>
+
+    <div class="form-row col2" style="margin-bottom:10px">
+      <div class="form-group">
+        <label>Satuan *</label>
+        <select id="inl-satuan">
+          <option value="">— Pilih —</option>
+          <option>gram</option><option>kg</option><option>ml</option><option>liter</option>
+          <option>butir</option><option>buah</option><option>lembar</option>
+          <option>sendok teh</option><option>sendok makan</option>
+          <option>bungkus</option><option>porsi</option><option>pcs</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Kategori</label>
+        <select id="inl-kategori">
+          <option>Protein</option><option>Sayuran</option><option>Bumbu</option>
+          <option>Minuman</option><option>Dairy</option>
+          <option>Tepung &amp; Biji</option><option>Kemasan</option>
+          <option selected>Lainnya</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="background:var(--cream);border:1px solid var(--border);
+                padding:12px 14px;margin-bottom:10px;border-radius:0">
+      <div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;
+                  color:var(--caramel);margin-bottom:8px;font-weight:500">
+        Hitung Harga/Satuan dari Pembelian
+      </div>
+      <div class="form-row col2" style="margin-bottom:6px">
+        <div class="form-group">
+          <label>Jumlah Beli</label>
+          <input id="inl-qty" type="number" min="0" step="any"
+                 placeholder="contoh: 1000" oninput="calcInlineHarga()">
+        </div>
+        <div class="form-group">
+          <label>Total Harga Beli (Rp)</label>
+          <input id="inl-total" type="number" min="0"
+                 placeholder="contoh: 50000" oninput="calcInlineHarga()">
+        </div>
+      </div>
+      <div id="inl-preview" style="font-size:11px;color:var(--caramel);
+                                   font-style:italic;min-height:16px"></div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Harga/Satuan (Rp) *</label>
+      <input id="inl-harga" type="number" min="0"
+             placeholder="Isi manual atau gunakan kalkulator di atas" onkeydown="_formEnter(event,submitInlineBahan)">
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="font-size:10px;padding:8px 16px"
+              onclick="submitInlineBahan()">
+        ✓ Simpan &amp; Gunakan
+      </button>
+      <button class="btn btn-ghost" style="font-size:10px;padding:8px 14px"
+              onclick="cancelInlineBahan()">
+        Batal
+      </button>
+    </div>`;
+
+  // Sisipkan setelah baris yang bersangkutan
+  row.insertAdjacentElement('afterend', form);
+  document.getElementById('inl-satuan').focus();
+}
+
+function calcInlineHarga() {
+  const qty   = parseFloat(document.getElementById('inl-qty').value)   || 0;
+  const total = parseFloat(document.getElementById('inl-total').value) || 0;
+  const prev  = document.getElementById('inl-preview');
+  if (qty > 0 && total > 0) {
+    const per = Math.round(total / qty * 1000) / 1000;
+    document.getElementById('inl-harga').value = per;
+    const sat = document.getElementById('inl-satuan').value || 'satuan';
+    prev.innerHTML =
+      `<span style="color:var(--caramel)">→ Rp ${fmtNum(per)} / ${sat}</span>`;
+  } else {
+    prev.textContent = '';
+  }
+}
+
+function cancelInlineBahan() {
+  const form = document.getElementById('inline-bahan-form');
+  if (!form) return;
+  const rowId = form.dataset.rowId;
+  const row   = document.getElementById(rowId);
+  if (row) {
+    row.querySelector('.ing-nama').value    = '';
+    row.querySelector('.ing-bahanId').value = '';
+    _unlockRow(rowId);
+  }
+  form.remove();
+}
+
+function submitInlineBahan() {
+  const form     = document.getElementById('inline-bahan-form');
+  if (!form) return;
+  const rowId    = form.dataset.rowId;
+  const row      = document.getElementById(rowId);
+  const nama     = row.querySelector('.ing-nama').value.trim();
+  const satuan   = document.getElementById('inl-satuan').value;
+  const harga    = parseFloat(document.getElementById('inl-harga').value) || 0;
+  const kategori = document.getElementById('inl-kategori').value;
+
+  if (!nama)   { alert('Nama bahan tidak boleh kosong.'); return; }
+  if (!satuan) { alert('Pilih satuan terlebih dahulu.'); return; }
+  if (!harga)  { alert('Isi harga/satuan terlebih dahulu.'); return; }
+
+  const saveBtn = form.querySelector('button.btn-primary');
+  saveBtn.disabled   = true;
+  saveBtn.textContent = 'Menyimpan…';
+  _prog.start('Menyimpan Bahan Baru');
+
+  gasRun()
+    .withSuccessHandler(res => {
+      saveBtn.disabled    = false;
+      saveBtn.textContent = '✓ Simpan & Gunakan';
+      if (res && res.success) {
+        _prog.complete('Bahan Tersimpan');
+        allBahan.push({ id: res.id, nama, satuan, harga, kategori, updated: '' });
+        selectBahan(rowId, res.id, nama, satuan, harga);
+        form.remove();
+        recalcPrep();
+      } else {
+        _prog.error('Gagal Menyimpan');
+        alert((res && res.error) || 'Gagal menyimpan bahan baru.');
+        saveBtn.disabled = false;
+      }
+    })
+    .withFailureHandler(err => {
+      saveBtn.disabled    = false;
+      saveBtn.textContent = '✓ Simpan & Gunakan';
+      _prog.error('Error');
+      alert('Error: ' + err.message);
+    })
+    .saveBahanBaku({ nama, satuan, harga, kategori });
+}
+
+// ───────────────────────────────────────────────
+// IMPORT MASSAL
+// ───────────────────────────────────────────────
+
+function switchImportTab(tab, btn) {
+  document.querySelectorAll('.import-tab').forEach(b => {
+    b.style.borderBottomColor = 'transparent';
+    b.style.color = 'var(--muted)';
+  });
+  btn.style.borderBottomColor = 'var(--caramel)';
+  btn.style.color = 'var(--gold)';
+  document.getElementById('import-tab-produk').style.display = tab === 'produk' ? '' : 'none';
+  document.getElementById('import-tab-bahan').style.display  = tab === 'bahan'  ? '' : 'none';
+}
+
+function _parseCSV(text) {
+  return text.split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
+    .map(line => line.split(',').map(c => c.trim()));
+}
+
+function previewImport(type) {
+  const text = document.getElementById('csv-' + type).value;
+  const rows = _parseCSV(text);
+  const tbody = document.getElementById('preview-body-' + type);
+  const count = document.getElementById('preview-count-' + type);
+  const box   = document.getElementById('preview-' + type);
+  const btn   = document.getElementById('btn-import-' + type);
+  tbody.innerHTML = '';
+  let valid = 0;
+
+  rows.forEach(cols => {
+    if (!cols[0]) return;
+    if (type === 'produk') {
+      const nama     = cols[0] || '';
+      const kat      = cols[1] || '';
+      const harga    = parseFloat(cols[2]) || 0;
+      const hppBahan = parseFloat(cols[3]) || 0;
+      const ovhd     = parseFloat(cols[4]) || 40;
+      if (!nama || !harga) return;
+      const hppTotal = hppBahan * (1 + ovhd / 100);
+      const margin   = harga > 0 ? Math.round((harga - hppTotal) / harga * 100 * 10) / 10 : 0;
+      const mc       = margin >= 60 ? 'var(--g)' : margin >= 50 ? 'var(--a)' : 'var(--r)';
+      tbody.innerHTML += `<tr>
+        <td>${esc(nama)}</td><td>${esc(kat)}</td>
+        <td class="num">${fmt(harga)}</td><td class="num">${hppBahan?fmt(hppBahan):'—'}</td>
+        <td class="num">${ovhd}%</td>
+        <td class="num" style="color:${mc};font-weight:500">${hppBahan?margin+'%':'—'}</td>
+      </tr>`;
+      valid++;
+    } else {
+      const nama  = cols[0] || '';
+      const sat   = cols[1] || '';
+      const harga = parseFloat(cols[2]) || 0;
+      const kat   = cols[3] || 'Lainnya';
+      if (!nama) return;
+      tbody.innerHTML += `<tr>
+        <td>${esc(nama)}</td><td>${esc(sat)}</td>
+        <td class="num">${harga?fmt(harga):'—'}</td><td>${esc(kat)}</td>
+      </tr>`;
+      valid++;
+    }
+  });
+
+  box.style.display = valid > 0 ? '' : 'none';
+  count.textContent = valid;
+  btn.disabled = valid === 0;
+  btn.textContent = `Import ${valid} ${type === 'produk' ? 'Produk' : 'Bahan'}`;
+}
+
+function runImport(type) {
+  const text = document.getElementById('csv-' + type).value;
+  const rows = _parseCSV(text);
+  const btn  = document.getElementById('btn-import-' + type);
+  btn.disabled = true;
+  btn.textContent = 'Mengimport…';
+  _prog.start('Import ' + (type === 'produk' ? 'Produk' : 'Bahan Baku'));
+
+  let data = [];
+  rows.forEach(cols => {
+    if (!cols[0]) return;
+    if (type === 'produk') {
+      if (!cols[0] || !parseFloat(cols[2])) return;
+      data.push({
+        nama: cols[0], kategori: cols[1] || '',
+        hargaJual: parseFloat(cols[2]) || 0,
+        hppBahan:  parseFloat(cols[3]) || 0,
+        overheadPct: parseFloat(cols[4]) || 40
+      });
+    } else {
+      if (!cols[0]) return;
+      data.push({
+        nama: cols[0], satuan: cols[1] || '',
+        harga: parseFloat(cols[2]) || 0,
+        kategori: cols[3] || 'Lainnya'
+      });
+    }
+  });
+
+  const fn = type === 'produk' ? 'importProdukBulk' : 'importBahanBulk';
+
+  gasRun()
+    .withSuccessHandler(res => {
+      btn.disabled = false;
+      if (res && res.success) {
+        _prog.complete('Import Selesai');
+        showAlert('alert-import',
+          `✓ ${res.added} ${type==='produk'?'produk':'bahan'} berhasil diimport` +
+          (res.skipped > 0 ? ` · ${res.skipped} dilewati (sudah ada)` : ''),
+          'success');
+        btn.textContent = `Import ${type === 'produk' ? 'Produk' : 'Bahan'}`;
+        document.getElementById('csv-' + type).value = '';
+        document.getElementById('preview-' + type).style.display = 'none';
+        btn.disabled = true;
+        // Invalidate caches
+        allBahan = []; allProduk = [];
+      } else {
+        _prog.error('Gagal');
+        showAlert('alert-import', (res && res.error) || 'Terjadi kesalahan.', 'error');
+        btn.disabled = false;
+        btn.textContent = `Import ${data.length} ${type==='produk'?'Produk':'Bahan'}`;
+      }
+    })
+    .withFailureHandler(err => {
+      _prog.error('Error');
+      btn.disabled = false;
+      btn.textContent = `Import ${data.length} ${type==='produk'?'Produk':'Bahan'}`;
+      showAlert('alert-import', 'Error: ' + err.message, 'error');
+    })
+    [fn](data);
+}
+
+// ───────────────────────────────────────────────
+// RESEP DROPDOWN (Semua Produk)
+// ───────────────────────────────────────────────
+const _resepCache = {}; // cache lokal agar tidak fetch berulang
+
+function toggleResep(produkId, rowEl) {
+  const detailRowId = 'resep-detail-' + produkId;
+  const chevron     = document.getElementById('chevron-' + produkId);
+  const existing    = document.getElementById(detailRowId);
+
+  if (existing) {
+    // Toggle buka/tutup
+    const inner  = existing.querySelector('.resep-detail-inner');
+    const isOpen = inner.style.maxHeight && inner.style.maxHeight !== '0px';
+    if (isOpen) {
+      inner.style.maxHeight = '0';
+      chevron.style.transform = '';
+      rowEl.classList.remove('expanded');
+    } else {
+      inner.style.maxHeight = inner.scrollHeight + 'px';
+      chevron.style.transform = 'rotate(90deg)';
+      rowEl.classList.add('expanded');
+    }
+    return;
+  }
+
+  // Buka pertama kali — buat row skeleton dulu
+  const prodRow   = document.getElementById('prod-row-' + produkId);
+  const detailRow = document.createElement('tr');
+  detailRow.id = detailRowId;
+  detailRow.className = 'resep-detail-row';
+  detailRow.innerHTML = `
+    <td colspan="11">
+      <div class="resep-detail-inner" id="inner-${produkId}">
+        <div style="padding:16px 24px;color:rgba(232,208,160,.5);
+                    font-size:12px;font-style:italic;letter-spacing:1px">
+          Memuat resep…
+        </div>
+      </div>
+    </td>`;
+  prodRow.insertAdjacentElement('afterend', detailRow);
+
+  // Buka animasi — set maxHeight ke scrollHeight skeleton
+  requestAnimationFrame(() => {
+    const inner = document.getElementById('inner-' + produkId);
+    inner.style.maxHeight = inner.scrollHeight + 'px';
+  });
+  chevron.style.transform = 'rotate(90deg)';
+  rowEl.classList.add('expanded');
+
+  // Pakai cache kalau ada
+  if (_resepCache[produkId]) {
+    _renderResepDetail(produkId, _resepCache[produkId]);
+    return;
+  }
+
+  // Fetch dari server
+  gasRun()
+    .withSuccessHandler(resep => {
+      _resepCache[produkId] = Array.isArray(resep) ? resep : [];
+      _renderResepDetail(produkId, _resepCache[produkId]);
+    })
+    .withFailureHandler(() => {
+      const inner = document.getElementById('inner-' + produkId);
+      if (inner) {
+        inner.innerHTML =
+          '<div style="padding:12px 24px;color:var(--red);font-size:12px">Gagal memuat resep.</div>';
+        inner.style.maxHeight = inner.scrollHeight + 'px';
+      }
+    })
+    .getResepByProduk(produkId);
+}
+
+function _renderResepDetail(produkId, resep) {
+  const inner = document.getElementById('inner-' + produkId);
+  if (!inner) return;
+
+  if (!resep || resep.length === 0) {
+    inner.innerHTML =
+      '<div style="padding:12px 24px;color:rgba(232,208,160,.4);font-size:12px;font-style:italic">Resep kosong.</div>';
+    inner.style.maxHeight = inner.scrollHeight + 'px';
+    return;
+  }
+
+  const totalHPP = resep.reduce((s, r) => s + (r.subtotal || 0), 0);
+
+  inner.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Nama Bahan</th>
+          <th>Satuan</th>
+          <th class="r-num">Jumlah</th>
+          <th class="r-num">Harga / Satuan</th>
+          <th class="r-num">Subtotal HPP</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${resep.map(r => `
+          <tr>
+            <td>${esc(r.namaBahan)}</td>
+            <td>${esc(r.satuan)}</td>
+            <td class="r-num">${fmtNum(r.jumlah)}</td>
+            <td class="r-num">${fmt(r.hargaSatuan)}</td>
+            <td class="r-num">${fmt(r.subtotal)}</td>
+          </tr>`).join('')}
+        <tr style="border-top:1px solid rgba(212,160,64,.2)">
+          <td colspan="4" style="text-align:right;color:rgba(232,208,160,.5)!important;
+              letter-spacing:2px;font-size:10px;text-transform:uppercase">
+            Total HPP Bahan
+          </td>
+          <td class="r-num r-total">${fmt(totalHPP)}</td>
+        </tr>
+      </tbody>
+    </table>`;
+
+  // Set maxHeight ke tinggi konten aktual (tidak ada batasan)
+  // requestAnimationFrame memastikan DOM sudah dirender sebelum baca scrollHeight
+  requestAnimationFrame(() => {
+    inner.style.maxHeight = inner.scrollHeight + 'px';
+  });
+}
+
+// Bersihkan cache resep saat produk diupdate/dihapus
+function _clearResepCache(produkId) {
+  delete _resepCache[produkId];
+  const detailRow = document.getElementById('resep-detail-' + produkId);
+  if (detailRow) detailRow.remove();
+}
+
+// ───────────────────────────────────────────────
+// KEYBOARD NAVIGATION ENGINE
+// ───────────────────────────────────────────────
+
+/**
+ * Handler untuk tombol arah + Enter + Escape pada dropdown.
+ * Dipanggil via onkeydown="_ddKey(event, dropdownId)"
+ */
+function _ddKey(e, ddId) {
+  const dd = document.getElementById(ddId);
+  if (!dd) return;
+  const isOpen = dd.classList.contains('open');
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!isOpen) {
+      // Buka dropdown kalau belum terbuka
+      const inp = e.target;
+      if (inp.id && inp.id.startsWith('f-') || inp.id === 'm-kategori') {
+        // Combo input
+        comboOpen(ddId === 'komboMenu' ? 'komboMenu' : 'komboBahan');
+      } else {
+        dd.classList.add('open');
+      }
+    }
+    _ddMove(dd, 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (isOpen) _ddMove(dd, -1);
+  } else if (e.key === 'Enter') {
+    if (!isOpen) return; // biarkan _formEnter handle jika tidak ada dropdown
+    e.preventDefault();
+    e.stopPropagation(); // jangan trigger form submit
+    const active = dd.querySelector('.ac-item.kb-active') || dd.querySelector('.ac-item');
+    if (active) {
+      // Trigger handler item (onclick atau onmousedown)
+      active.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      active.dispatchEvent(new MouseEvent('click',     { bubbles: true }));
+    }
+    _ddClear(dd);
+  } else if (e.key === 'Escape') {
+    dd.classList.remove('open');
+    _ddClear(dd);
+  }
+}
+
+function _ddMove(dd, dir) {
+  const items = [...dd.querySelectorAll('.ac-item')];
+  if (!items.length) return;
+  const cur = dd.querySelector('.ac-item.kb-active');
+  let idx = cur ? items.indexOf(cur) : -1;
+  _ddClear(dd);
+  idx = Math.max(0, Math.min(items.length - 1, idx + dir));
+  items[idx].classList.add('kb-active');
+  items[idx].scrollIntoView({ block: 'nearest' });
+}
+
+function _ddClear(dd) {
+  dd.querySelectorAll('.ac-item.kb-active').forEach(i => i.classList.remove('kb-active'));
+}
+
+/**
+ * Enter-to-submit: jalankan submitFn jika:
+ *  - Tombol yang ditekan adalah Enter
+ *  - Target bukan textarea
+ *  - Tidak ada dropdown yang sedang terbuka
+ */
+function _formEnter(e, submitFn) {
+  if (e.key !== 'Enter') return;
+  if (e.target.tagName === 'TEXTAREA') return;
+  // Cek apakah ada dropdown terbuka di halaman
+  if (document.querySelector('.ac-dropdown.open')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  submitFn();
+}
+
+// ───────────────────────────────────────────────
+// SIMULASI BUNDLING
+// ───────────────────────────────────────────────
+const BUNDLE_KEY = 'restless_bundles';
+let bundleItems = [];
+const PALETTE = ['#B8762A','#2E6B45','#4A2810','#7A6040','#1C5478','#6B3A2E','#3A5C28'];
+
+function initBundlingPage() {
+  renderBundlePicker();
+  loadBundleRefs();
+  if (allProduk.length === 0) {
+    _prog.start('Memuat Produk');
+    gasRun()
+      .withSuccessHandler(data => {
+        _prog.complete('Produk Dimuat');
+        allProduk = data.items || [];
+        _populateKategoriFilter(allProduk);
+        renderBundlePicker();
+      })
+      .withFailureHandler(err => { _prog.error('Gagal'); onFail(err); })
+      .getProduk();
+  }
+}
+
+function renderBundlePicker(filter) {
+  const el = document.getElementById('bundle-picker');
+  if (!el) return;
+  const q = (filter || '').toLowerCase();
+  const items = allProduk.filter(p =>
+    !q || p.nama.toLowerCase().includes(q) || p.kategori.toLowerCase().includes(q)
+  );
+  if (items.length === 0) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;font-style:italic">Tidak ada produk ditemukan</div>';
+    return;
+  }
+  const inBundle = new Set(bundleItems.map(b => b.id));
+  el.innerHTML = items.map(p => {
+    const mc = p.marginPct >= 60 ? 'var(--green)' : p.marginPct >= 50 ? 'var(--amber)' : 'var(--red)';
+    const isIn = inBundle.has(p.id);
+    return `<div class="product-pick ${isIn?'in-bundle':''}" onclick="${isIn?'':  `addToBundle('${p.id}')`}">
+      <div style="min-width:0">
+        <div style="font-size:13px;font-weight:500;color:var(--ink)">${esc(p.nama)}</div>
+        <div style="font-size:11px;color:var(--muted)">${esc(p.kategori)} · <span style="color:${mc}">${p.marginPct}%</span></div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:12px;font-weight:500">${fmt(p.hargaJual)}</div>
+        <button class="product-pick-add" ${isIn?'disabled':''} style="${isIn?'background:var(--muted)':''}"
+                title="${isIn?'Sudah di bundle':'Tambah ke bundle'}">
+          ${isIn?'✓':'+'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterBundlePicker(q) { renderBundlePicker(q); }
+
+function addToBundle(id) {
+  const p = allProduk.find(x => x.id === id);
+  if (!p || bundleItems.find(x => x.id === id)) return;
+  bundleItems.push({
+    id: p.id, nama: p.nama, kategori: p.kategori,
+    hargaJual: p.hargaJual, hppTotal: p.hppTotal,
+    marginPct: p.marginPct, marginNom: p.marginNominal
+  });
+  renderBundleComposition();
+  renderBundlePicker(document.getElementById('bundle-search').value);
+}
+
+function removeFromBundle(id) {
+  bundleItems = bundleItems.filter(x => x.id !== id);
+  renderBundleComposition();
+  renderBundlePicker(document.getElementById('bundle-search').value);
+}
+
+function clearBundle() {
+  bundleItems = [];
+  document.getElementById('bundle-name').value = '';
+  renderBundleComposition();
+  renderBundlePicker();
+}
+
+function renderBundleComposition() {
+  const el      = document.getElementById('bundle-items');
+  const countEl = document.getElementById('bundle-item-count');
+  const totals  = document.getElementById('bundle-totals');
+  const kpis    = document.getElementById('bundle-kpis');
+  const calcPan = document.getElementById('bundle-calc-panel');
+
+  countEl.textContent = bundleItems.length + ' item';
+
+  if (bundleItems.length === 0) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;font-style:italic">Pilih produk dari panel kiri untuk mulai simulasi</div>';
+    totals.style.display = 'none';
+    if (kpis) kpis.style.display = 'none';
+    if (calcPan) calcPan.style.display = 'none';
+    return;
+  }
+
+  el.innerHTML = bundleItems.map((item, i) => {
+    const col = PALETTE[i % PALETTE.length];
+    const mc  = item.marginPct >= 60 ? 'var(--green)' : item.marginPct >= 50 ? 'var(--amber)' : 'var(--red)';
+    return `<div class="bundle-item">
+      <div class="bundle-item-color" style="background:${col}"></div>
+      <div class="bundle-item-info">
+        <div class="bundle-item-name">${esc(item.nama)}</div>
+        <div class="bundle-item-meta">${esc(item.kategori)} · Margin <span style="color:${mc}">${item.marginPct}%</span> · HPP ${fmt(item.hppTotal)} · <span style="color:var(--green);font-weight:500">Untung ${fmt(item.marginNom)}</span></div>
+      </div>
+      <div class="bundle-item-price">${fmt(item.hargaJual)}</div>
+      <button class="bundle-remove" onclick="removeFromBundle('${item.id}')" title="Hapus dari bundle">×</button>
+    </div>`;
+  }).join('');
+
+  totals.style.display = 'block';
+  if (kpis) kpis.style.display = 'grid';
+  if (calcPan) calcPan.style.display = 'block';
+  recalcBundle();
+}
+
+function recalcBundle() {
+  const totalHarga = bundleItems.reduce((s, x) => s + x.hargaJual, 0);
+  const totalHpp   = bundleItems.reduce((s, x) => s + x.hppTotal,  0);
+  const margGab    = totalHarga > 0 ? (totalHarga - totalHpp) / totalHarga * 100 : 0;
+  const profitNormal = totalHarga - totalHpp;
+  const mc = margGab >= 60 ? 'var(--green)' : margGab >= 50 ? 'var(--amber)' : 'var(--red)';
+
+  document.getElementById('total-harga-normal').textContent = fmt(totalHarga);
+  document.getElementById('total-hpp').textContent          = fmt(totalHpp);
+  document.getElementById('total-margin-normal').textContent = margGab.toFixed(1) + '%';
+  document.getElementById('total-margin-normal').style.color = mc;
+  document.getElementById('total-keuntungan-normal').textContent = fmt(profitNormal);
+
+  document.getElementById('kpi-harga-normal').textContent = fmt(totalHarga);
+
+  // Scenarios — tampilkan harga DAN keuntungan Rp
+  [50, 55, 60, 65].forEach(m => {
+    const sp     = _bundlePrice(totalHpp, m);
+    const profit = sp - totalHpp;
+    const spEl   = document.getElementById('sc-' + m);
+    const prEl   = document.getElementById('sc-profit-' + m);
+    if (spEl) spEl.textContent = fmt(sp);
+    if (prEl) prEl.textContent = '+ ' + fmt(profit);
+  });
+
+  const target = parseInt(document.getElementById('target-margin').value) || 60;
+  _updateSaranHarga(totalHpp, totalHarga, target);
+}
+
+function _bundlePrice(totalHpp, targetMargin) {
+  const raw = totalHpp / (1 - targetMargin / 100);
+  return Math.ceil(raw / 1000) * 1000; // bulatkan ke atas ke ribuan terdekat
+}
+
+function updateTargetMargin(val) {
+  document.getElementById('target-margin-val').textContent = val + '%';
+  const totalHpp   = bundleItems.reduce((s, x) => s + x.hppTotal,  0);
+  const totalHarga = bundleItems.reduce((s, x) => s + x.hargaJual, 0);
+  _updateSaranHarga(totalHpp, totalHarga, parseInt(val));
+}
+
+function _updateSaranHarga(totalHpp, totalHarga, target) {
+  const sp      = _bundlePrice(totalHpp, target);
+  const profit  = sp - totalHpp;
+  const hemat   = totalHarga - sp;
+  const hematPct = totalHarga > 0 ? hemat / totalHarga * 100 : 0;
+
+  document.getElementById('saran-harga').textContent       = fmt(sp);
+  document.getElementById('saran-keuntungan').textContent  = fmt(profit);
+  document.getElementById('kpi-harga-bundle').textContent  = fmt(sp);
+  document.getElementById('kpi-keuntungan').textContent    = fmt(profit);
+  document.getElementById('kpi-hemat').textContent         = fmt(Math.max(0, hemat));
+
+  let detail = `HPP total ${fmt(totalHpp)} · Keuntungan ${fmt(profit)} · Target margin ${target}%`;
+  if (hemat > 0) {
+    detail += ` · Pelanggan hemat ${fmt(hemat)} (${hematPct.toFixed(1)}%)`;
+  } else if (hemat < 0) {
+    detail += ` · ⚠ Harga bundle lebih mahal ${fmt(-hemat)} dari total normal`;
+  }
+  document.getElementById('saran-detail').textContent = detail;
+}
+
+function setScenario(margin, el) {
+  document.querySelectorAll('.scenario-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('target-margin').value = margin;
+  document.getElementById('target-margin-val').textContent = margin + '%';
+  const totalHpp   = bundleItems.reduce((s, x) => s + x.hppTotal,  0);
+  const totalHarga = bundleItems.reduce((s, x) => s + x.hargaJual, 0);
+  _updateSaranHarga(totalHpp, totalHarga, margin);
+}
+
+function saveBundle() {
+  if (bundleItems.length < 2) {
+    showAlert('alert-bundling', 'Pilih minimal 2 produk untuk membuat bundle.', 'error'); return;
+  }
+  const name = document.getElementById('bundle-name').value.trim() || 'Bundle ' + new Date().toLocaleDateString('id-ID');
+  const target = parseInt(document.getElementById('target-margin').value) || 60;
+  const totalHarga = bundleItems.reduce((s, x) => s + x.hargaJual, 0);
+  const totalHpp   = bundleItems.reduce((s, x) => s + x.hppTotal,  0);
+  const sp = _bundlePrice(totalHpp, target);
+
+  const bundle = {
+    id: Date.now(),
+    name,
+    items: bundleItems.map(b => ({ nama: b.nama, harga: b.hargaJual })),
+    totalHarga,
+    totalHpp,
+    targetMargin: target,
+    suggestedPrice: sp,
+    profit: sp - totalHpp,
+    hemat: totalHarga - sp,
+    savedAt: new Date().toLocaleDateString('id-ID')
+  };
+
+  const saved = _loadBundles();
+  saved.unshift(bundle);
+  localStorage.setItem(BUNDLE_KEY, JSON.stringify(saved));
+  loadBundleRefs();
+  document.getElementById('bundle-name').value = '';
+  showAlert('alert-bundling', `Bundle "${name}" berhasil disimpan sebagai referensi.`, 'success');
+}
+
+function _loadBundles() {
+  try { return JSON.parse(localStorage.getItem(BUNDLE_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function deleteBundle(id) {
+  const saved = _loadBundles().filter(b => b.id !== id);
+  localStorage.setItem(BUNDLE_KEY, JSON.stringify(saved));
+  loadBundleRefs();
+}
+
+function loadBundleRefs() {
+  const saved = _loadBundles();
+  const el  = document.getElementById('bundle-ref-list');
+  const cnt = document.getElementById('bundle-ref-count');
+  if (!el) return;
+  cnt.textContent = saved.length + ' bundle';
+
+  if (saved.length === 0) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;font-style:italic">Belum ada bundle tersimpan</div>';
+    return;
+  }
+
+  el.innerHTML = saved.map(b => `
+    <div class="bundle-ref">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--ink)">${esc(b.name)}</div>
+          <div style="font-size:11px;color:var(--muted)">${b.items.length} item · Disimpan ${b.savedAt}</div>
+        </div>
+        <button onclick="deleteBundle(${b.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 4px" title="Hapus bundle">×</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${b.items.map(i=>esc(i.nama)).join(' + ')}</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="font-size:11px"><span style="color:var(--muted)">Harga normal: </span><span style="text-decoration:line-through">${fmt(b.totalHarga)}</span></div>
+        <div style="font-size:11px"><span style="color:var(--muted)">Bundle: </span><strong style="color:var(--caramel)">${fmt(b.suggestedPrice)}</strong></div>
+        <div style="font-size:11px"><span style="color:var(--muted)">Untung: </span><strong style="color:var(--green)">${fmt(b.profit||0)}</strong></div>
+        <div style="font-size:11px"><span style="color:var(--muted)">Hemat: </span><span style="color:var(--caramel)">${fmt(Math.max(0,b.hemat))}</span></div>
+        <div style="font-size:11px"><span style="color:var(--muted)">Margin: </span><span>${b.targetMargin}%</span></div>
+      </div>
+    </div>`).join('');
+}
+
+// Accessible feedback and modal focus management
+let _modalReturnFocus = null;
+function showToast(message, type) {
+  const region = document.getElementById('toast-region');
+  if (!region) return;
+  const toast = document.createElement('div');
+  toast.className = 'ux-toast ' + (type || '');
+  toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  toast.textContent = message;
+  region.appendChild(toast);
+  setTimeout(() => toast.remove(), 3600);
+}
+
+function _openAccessibleModal(id, focusId) {
+  const modal = document.getElementById(id);
+  _modalReturnFocus = document.activeElement;
+  modal.setAttribute('aria-hidden','false');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => {
+    const target = focusId ? document.getElementById(focusId) : modal.querySelector('button,input,select');
+    if (target) target.focus();
+  }, 0);
+}
+
+function _closeAccessibleModal(id) {
+  const modal = document.getElementById(id);
+  modal.setAttribute('aria-hidden','true');
+  document.body.style.overflow = '';
+  if (_modalReturnFocus && typeof _modalReturnFocus.focus === 'function') _modalReturnFocus.focus();
+  _modalReturnFocus = null;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('bahanModal').classList.contains('open')) closeBahanModal();
+  else if (document.getElementById('deleteModal').classList.contains('open')) closeDeleteModal();
+  else {
+    document.getElementById('nav-more-dropdown').style.display = 'none';
+    document.getElementById('nav-more-btn').setAttribute('aria-expanded','false');
+  }
+});
+
+// ───────────────────────────────────────────────
+// INIT
+// ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadCustomCategories();
+  loadDashboard();
+  addIngredientRow();
+  addPrepIngRow();
+  const initial = location.hash.replace('#','');
+  const primary = { dashboard:0, inputProduk:1, prep:2, produk:3 };
+  if (primary[initial] !== undefined) showPage(initial, document.querySelectorAll('.nav-btn')[primary[initial]]);
+  else if (['bahan','import','bundling'].includes(initial)) showPageMore(initial);
+});
+</script>
+<!-- ══ PAGE: SIMULASI BUNDLING ══ -->
+<div class="page" id="page-bundling" style="max-width:1100px">
+  <div class="page-header">
+    <div class="page-title">Simulasi <em>Bundling</em></div>
+    <button class="btn btn-outline" onclick="clearBundle()">↺ Reset</button>
+  </div>
+  <div id="alert-bundling" class="alert"></div>
+
+  <div class="bundle-layout">
+
+    <!-- KIRI: PILIH PRODUK -->
+    <div>
+      <div class="bundle-panel" style="margin-bottom:16px">
+        <div class="bundle-panel-title">Pilih Produk untuk Bundle</div>
+        <div style="position:relative;margin-bottom:10px">
+          <input id="bundle-search" class="search-input" placeholder="Cari nama produk…"
+                 oninput="filterBundlePicker(this.value)"
+                 style="width:100%;padding:9px 12px;padding-left:32px">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);
+                        color:var(--muted);font-size:13px">🔍</span>
+        </div>
+        <div id="bundle-picker" style="max-height:340px;overflow-y:auto;
+             border:1px solid var(--border)">
+          <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;font-style:italic">
+            Memuat produk…
+          </div>
+        </div>
+      </div>
+
+      <!-- SAVED BUNDLES -->
+      <div class="bundle-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="bundle-panel-title" style="margin-bottom:0">Referensi Bundle Tersimpan</div>
+          <span id="bundle-ref-count" style="font-size:11px;color:var(--muted)">0 bundle</span>
+        </div>
+        <div id="bundle-ref-list">
+          <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;font-style:italic">
+            Belum ada bundle tersimpan
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KANAN: KOMPOSISI & KALKULASI -->
+    <div>
+      <!-- Bundle items -->
+      <div class="bundle-panel" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="bundle-panel-title" style="margin-bottom:0">Komposisi Bundle</div>
+          <span id="bundle-item-count" style="font-size:11px;color:var(--muted)">0 item</span>
+        </div>
+        <div id="bundle-items">
+          <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;font-style:italic">
+            Pilih produk dari panel kiri untuk mulai simulasi
+          </div>
+        </div>
+        <div id="bundle-totals" style="display:none;padding-top:12px;border-top:2px solid var(--border);margin-top:4px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+            <span>Total Harga Normal</span>
+            <span id="total-harga-normal">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+            <span>Total HPP Gabungan</span>
+            <span id="total-hpp">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:4px">
+            <span>Margin Gabungan (harga normal)</span>
+            <span id="total-margin-normal">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;
+                      padding-top:6px;border-top:1px dashed var(--border)">
+            <span style="color:var(--green)">Keuntungan di Harga Normal</span>
+            <span id="total-keuntungan-normal" style="color:var(--green)">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div id="bundle-kpis" style="display:none;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+        <div class="kpi-mini">
+          <div class="kpi-mini-val" id="kpi-harga-normal">—</div>
+          <div class="kpi-mini-lbl">Harga Normal</div>
+        </div>
+        <div class="kpi-mini" style="background:var(--ink)">
+          <div class="kpi-mini-val" id="kpi-harga-bundle" style="color:var(--gold)">—</div>
+          <div class="kpi-mini-lbl" style="color:rgba(232,208,160,.5)">Harga Bundle</div>
+        </div>
+        <div class="kpi-mini" style="background:#E8F5EE">
+          <div class="kpi-mini-val" id="kpi-keuntungan" style="color:var(--green)">—</div>
+          <div class="kpi-mini-lbl">Keuntungan / Bundle</div>
+        </div>
+        <div class="kpi-mini">
+          <div class="kpi-mini-val" id="kpi-hemat" style="color:var(--caramel)">—</div>
+          <div class="kpi-mini-lbl">Hemat Pelanggan</div>
+        </div>
+      </div>
+
+      <!-- TARGET MARGIN SLIDER -->
+      <div class="bundle-panel" style="margin-bottom:16px" id="bundle-calc-panel" style="display:none">
+        <div class="bundle-panel-title">Target Margin Bundle</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <input type="range" id="target-margin" min="40" max="75" value="60" step="1"
+                 oninput="updateTargetMargin(this.value)"
+                 style="flex:1">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;
+                      color:var(--caramel);min-width:52px;text-align:right"
+               id="target-margin-val">60%</div>
+        </div>
+
+        <!-- Scenarios -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">
+          <div class="scenario-card selected" onclick="setScenario(50,this)">
+            <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Agresif</div>
+            <div style="font-size:15px;font-weight:500;color:var(--amber)" id="sc-50">—</div>
+            <div style="font-size:10px;color:var(--muted)">50% margin</div>
+            <div style="font-size:11px;color:var(--green);margin-top:3px;font-weight:500" id="sc-profit-50">—</div>
+          </div>
+          <div class="scenario-card" onclick="setScenario(55,this)">
+            <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Ekonomis</div>
+            <div style="font-size:15px;font-weight:500" id="sc-55">—</div>
+            <div style="font-size:10px;color:var(--muted)">55% margin</div>
+            <div style="font-size:11px;color:var(--green);margin-top:3px;font-weight:500" id="sc-profit-55">—</div>
+          </div>
+          <div class="scenario-card selected" onclick="setScenario(60,this)">
+            <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Standar</div>
+            <div style="font-size:15px;font-weight:500;color:var(--green)" id="sc-60">—</div>
+            <div style="font-size:10px;color:var(--muted)">60% margin</div>
+            <div style="font-size:11px;color:var(--green);margin-top:3px;font-weight:500" id="sc-profit-60">—</div>
+          </div>
+          <div class="scenario-card" onclick="setScenario(65,this)">
+            <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Premium</div>
+            <div style="font-size:15px;font-weight:500" id="sc-65">—</div>
+            <div style="font-size:10px;color:var(--muted)">65% margin</div>
+            <div style="font-size:11px;color:var(--green);margin-top:3px;font-weight:500" id="sc-profit-65">—</div>
+          </div>
+        </div>
+
+        <!-- Saran harga -->
+        <div style="background:var(--ink);padding:16px 18px">
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--caramel);margin-bottom:8px">
+            Saran Harga Bundling
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap">
+            <div>
+              <div style="font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:700;color:var(--gold);line-height:1"
+                   id="saran-harga">—</div>
+              <div style="font-size:11px;color:rgba(232,208,160,.4);margin-top:2px">harga bundle</div>
+            </div>
+            <div>
+              <div style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;color:#5DBE8A;line-height:1"
+                   id="saran-keuntungan">—</div>
+              <div style="font-size:11px;color:rgba(232,208,160,.4);margin-top:2px">keuntungan / bundle</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:rgba(232,208,160,.5);margin-top:8px" id="saran-detail">—</div>
+        </div>
+
+        <!-- Save bundle -->
+        <div style="margin-top:14px;display:flex;gap:8px">
+          <input id="bundle-name" class="search-input"
+                 placeholder="Nama bundle (contoh: Paket Kenyang, Combo Sore…)"
+                 style="flex:1;padding:9px 12px"
+                 onkeydown="_formEnter(event,saveBundle)">
+          <button class="btn btn-primary" onclick="saveBundle()">Simpan Referensi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

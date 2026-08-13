@@ -56,11 +56,11 @@ const SupplierInvoices = () => {
 
   const handleCreateInvoice = (e) => {
     e.preventDefault();
-    createInvoice(newInvoice, invoiceItems);
-    setIsAddModalOpen(false);
-    // Reset
-    setNewInvoice({ supplierId: '', invoiceNo: '', date: new Date().toISOString().split('T')[0], dueDate: '' });
-    setInvoiceItems([{ materialId: '', quantity: 1, price: 0 }]);
+    createInvoice(newInvoice, invoiceItems).then(() => {
+      setIsAddModalOpen(false);
+      setNewInvoice({ supplierId: '', invoiceNo: '', date: new Date().toISOString().split('T')[0], dueDate: '' });
+      setInvoiceItems([{ materialId: '', quantity: 1, price: 0 }]);
+    }).catch(error => useStore.getState().addToast(error.message, 'error'));
   };
 
   const openPayModal = (inv) => {
@@ -138,7 +138,7 @@ const SupplierInvoices = () => {
                 return (
                   <tr key={inv.id}>
                     <td className="font-medium">{inv.invoiceNo}</td>
-                    <td>{supplier?.name}</td>
+                    <td><div className="font-medium">{supplier?.name || inv.supplierName}</div><div className="text-xs text-gray-500 mt-1">Tanggal invoice: {inv.date}</div></td>
                     <td>{inv.dueDate}</td>
                     <td>{formatRupiah(inv.total)}</td>
                     <td>{formatRupiah(inv.paid)}</td>

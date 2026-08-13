@@ -79,7 +79,7 @@ const StockMovement = () => {
                     <td className="text-sm text-gray-500">{h.reference || '-'}</td>
                     <td style={{ textAlign: 'right', color: 'var(--color-success)', fontWeight: 600 }}>{Number(h.qtyIn) > 0 ? `+${h.qtyIn}` : '-'}</td>
                     <td style={{ textAlign: 'right', color: 'var(--color-danger)', fontWeight: 600 }}>{Number(h.qtyOut) > 0 ? `-${h.qtyOut}` : '-'}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{h.balance} {mat?.unit}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{h.balance == null ? '—' : h.balance} {mat?.unit}</td>
                   </tr>
                 );
               })}

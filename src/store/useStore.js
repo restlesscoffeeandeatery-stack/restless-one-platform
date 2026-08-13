@@ -26,14 +26,15 @@ const uiType = type => type === 'Pemasukan' ? 'Income' : type === 'Pengeluaran' 
 const serverType = type => type === 'Income' ? 'Pemasukan' : 'Pengeluaran';
 const statusInvoice = status => status === 'Dibayar' ? 'Paid' : status === 'Terlambat' ? 'Overdue' : status === 'Terkirim' ? 'Unpaid' : 'Unpaid';
 
-function normalize(finance = {}, hppMaterials = {}, hppProducts = {}, hppPreparations = {}, platform = {}) {
+function normalize(finance = {}, inventory = {}, platform = {}) {
   const accounts = (finance.accounts || platform.accounts || []).filter(a => a.active !== false).map(a => ({
     id: String(a.id), name: a.name, type: a.kind || a.type || 'Bank / Cash', balance: Number(a.balance || 0)
   }));
   const transactions = (finance.transactions || []).map(t => ({
     id: String(t.id), date: t.date, type: uiType(t.type), category: t.category,
     description: t.description, accountId: t.type === 'Pemasukan' ? t.destinationAccount : t.sourceAccount,
-    amount: Number(t.amount || 0), status: 'Completed', notes: t.note || ''
+    sourceAccount: t.sourceAccount || '', destinationAccount: t.destinationAccount || '',
+    amount: Number(t.amount || 0), status: 'Completed', notes: t.note || '', period: t.period || ''
   }));
   const rawInvoices = finance.invoices || [];
   const supplierNames = [...new Set(rawInvoices.map(i => String(i.supplier || i.client || '').trim()).filter(Boolean))];
@@ -47,34 +48,40 @@ function normalize(finance = {}, hppMaterials = {}, hppProducts = {}, hppPrepara
     invoiceNo: i.number, date: i.invoiceDate, dueDate: i.dueDate, total: Number(i.total || 0),
     paid: i.status === 'Dibayar' ? Number(i.total || 0) : 0, status: statusInvoice(i.status), items: i.items || []
   }));
-  const stockMap = Object.fromEntries((platform.stock || []).map(s => [String(s.id), s]));
-  const materials = (hppMaterials.items || []).map(m => {
-    const stock = stockMap[String(m.id)] || {};
-    const quantity = Number(stock.stock || 0);
-    return { id: String(m.id), name: m.nama, category: m.kategori, unit: m.satuan, stock: quantity,
-      latestPrice: Number(stock.average || m.harga || 0), status: quantity <= 0 ? 'Out of Stock' : quantity <= 5 ? 'Low Stock' : 'In Stock' };
+  const materials = (inventory.materials || []).map(m => {
+    const quantity = Number(m.stock || 0);
+    return { id: String(m.id), name: m.name || m.nama, category: m.category || m.kategori, unit: m.unit || m.satuan, stock: quantity,
+      latestPrice: Number(m.average || m.harga || 0), updated: m.updated || '', status: quantity <= 0 ? 'Out of Stock' : quantity <= 5 ? 'Low Stock' : 'In Stock' };
   });
-  const preparations = (hppPreparations.items || []).map(p => ({
-    id: String(p.id), name: p.nama, unit: p.satuanHasil, yield: Number(p.yield || 0),
+  const preparations = (inventory.preparations || []).map(p => ({
+    id: String(p.id), name: p.name || p.nama, unit: p.unit || p.satuanHasil, yield: Number(p.yield || 0),
     hppTotal: Number(p.hppTotal || 0), hppPerUnit: Number(p.hppPerSatuan || 0), ingredients: []
   }));
-  const recipes = (hppProducts.items || []).map(p => ({
-    id: String(p.id), name: p.nama, category: p.kategori, sellingPrice: Number(p.hargaJual || 0),
-    hppTotal: Number(p.hppTotal || 0), margin: Number(p.marginPct || 0), ingredients: []
+  const recipes = (inventory.products || []).map(p => ({
+    id: String(p.id), name: p.name || p.nama, category: p.category || p.kategori, sellingPrice: Number(p.price || p.hargaJual || 0),
+    hppTotal: Number(p.hpp || p.hppTotal || 0), margin: Number(p.margin || p.marginPct || 0), ingredients: []
+  }));
+  const stockHistory = (inventory.stockHistory || []).map(row => ({
+    id: String(row.id), materialId: String(row.materialId), date: row.date, timestamp: row.timestamp,
+    type: row.type, category: row.category, reference: row.reference, user: row.user,
+    qtyIn: row.type === 'IN' ? Number(row.quantity || 0) : 0,
+    qtyOut: row.type === 'OUT' ? Number(row.quantity || 0) : 0,
+    price: Number(row.price || 0), value: Number(row.value || 0)
   }));
   const payrollHistory = (platform.payrollRuns || []).map(r => ({
     id: r.runId, period: `${r.start} – ${r.end}`, type: r.scheme === 'Fulltime' ? 'Full-time' : 'Part-time',
     date: r.end, status: r.status === 'POSTED' ? 'Paid' : 'Draft', totalAmount: Number(r.total || 0), employeesData: []
   }));
   return { accounts, transactions, categories: finance.categories || [], invoices, suppliers, materials,
-    preparations, recipes, stockHistory: [], priceHistory: [], employees: [], attendanceData: [], payrollHistory,
+    preparations, recipes, stockHistory, priceHistory: [], employees: [], attendanceData: [], payrollHistory,
+    budgets: finance.budgets || [], allocationRules: finance.allocationRules || [],
     summary: platform.summary || {}, syncLog: platform.sync || [] };
 }
 
 const emptyState = {
   accounts: [], suppliers: [], materials: [], preparations: [], recipes: [], invoices: [], employees: [],
   transactions: [], categories: [], stockHistory: [], priceHistory: [], payrollHistory: [], attendanceData: [],
-  summary: {}, syncLog: [], loading: true, refreshing: false, error: ''
+  budgets: [], allocationRules: [], summary: {}, syncLog: [], loading: true, refreshing: false, error: ''
 };
 
 export const useStore = create((set, get) => ({
@@ -89,10 +96,14 @@ export const useStore = create((set, get) => ({
     }
     try {
       set(silent ? { refreshing: true, error: '' } : { loading: !get().accounts.length, refreshing: true, error: '' });
-      const [finance, materials, products, preparations, platform] = await Promise.all([
-        rpc('getAppData'), rpc('getBahanBaku'), rpc('getProduk'), rpc('getPreparations'), rpc('getPlatformData', getPin())
+      const inventoryRequest = rpc('getInventoryWorkspace', getPin()).catch(async () => {
+        const [materials, products, preparations] = await Promise.all([rpc('getBahanBaku'), rpc('getProduk'), rpc('getPreparations')]);
+        return { materials: (materials.items || []).map(m => ({ ...m, name: m.nama, unit: m.satuan, category: m.kategori, average: m.harga })), products: products.items || [], preparations: preparations.items || [], stockHistory: [] };
+      });
+      const [finance, inventory, platform] = await Promise.all([
+        rpc('getAppData'), inventoryRequest, rpc('getPlatformData', getPin())
       ]);
-      const next = normalize(finance, materials, products, preparations, platform);
+      const next = normalize(finance, inventory, platform);
       localStorage.setItem(CACHE_KEY, JSON.stringify(next));
       set({ ...next, loading: false, refreshing: false });
     } catch (error) {
@@ -146,9 +157,43 @@ export const useStore = create((set, get) => ({
     get().addToast('Stok masuk berhasil dicatat.');
   },
 
+  addMaterial: async data => {
+    const result = await rpc('saveBahan', getPin(), { name: data.name, unit: data.unit, category: data.category, price: Number(data.price || 0), active: true });
+    const material = { id: String(result.id), name: data.name, unit: data.unit, category: data.category, stock: 0, latestPrice: Number(data.price || 0), status: 'Out of Stock' };
+    set({ materials: [...get().materials, material].sort((a, b) => a.name.localeCompare(b.name)) });
+    if (Number(data.openingStock) > 0) await get().stockIn(material.id, Number(data.openingStock), Number(data.price || 0), data.date, 'Stok awal material');
+    get().addToast('Material baru berhasil ditambahkan.');
+    return material;
+  },
+
+  loadPreparationDetail: async preparationId => {
+    const rows = await rpc('getPrepDetail', preparationId);
+    const ingredients = (rows || []).map(row => ({ id: String(row.bahanId), type: 'RAW_MATERIAL', quantity: Number(row.jumlah || 0), unit: row.satuan, price: Number(row.hargaSatuan || 0), subtotal: Number(row.subtotal || 0), name: row.namaBahan }));
+    set({ preparations: get().preparations.map(prep => prep.id === preparationId ? { ...prep, ingredients, detailLoaded: true } : prep) });
+    return ingredients;
+  },
+
+  savePreparation: async form => {
+    const bahan = form.ingredients.filter(item => item.id && Number(item.quantity) > 0).map(item => {
+      const material = get().materials.find(row => row.id === item.id);
+      return { bahanId: item.id, namaBahan: material?.name || '', satuan: item.unit || material?.unit || '', harga: Number(material?.latestPrice || 0), jumlah: Number(item.quantity) };
+    });
+    const result = await rpc('savePreparation', { nama: form.name, satuanHasil: form.unit, yield: Number(form.yield), bahan });
+    if (result?._error || result?.success === false) throw new Error(result._error || result.error || 'Preparation gagal disimpan.');
+    get().addToast('Preparation berhasil disimpan.');
+    await get().fetchState({ silent: true });
+  },
+
+  loadRecipeDetail: async productId => {
+    const rows = await rpc('getResepByProduk', productId);
+    const ingredients = (rows || []).map(row => ({ id: String(row.bahanId), type: 'RAW_MATERIAL', quantity: Number(row.jumlah || 0), unit: row.satuan, price: Number(row.hargaSatuan || 0), subtotal: Number(row.subtotal || 0), name: row.namaBahan }));
+    set({ recipes: get().recipes.map(recipe => recipe.id === productId ? { ...recipe, ingredients, detailLoaded: true } : recipe) });
+    return ingredients;
+  },
+
   updateMaterialPrice: async (materialId, newPrice) => {
     const material = get().materials.find(m => m.id === materialId);
-    await rpc('saveBahanBaku', { id: materialId, nama: material.name, satuan: material.unit, kategori: material.category, harga: Number(newPrice) });
+    await rpc('saveBahan', getPin(), { id: materialId, name: material.name, unit: material.unit, category: material.category, price: Number(newPrice), active: true });
     get().addToast('Harga bahan dan HPP terkait diperbarui.'); await get().fetchState({ silent: true });
   },
 
@@ -165,6 +210,31 @@ export const useStore = create((set, get) => ({
     const employees = (live.payrollAdmin?.employees || []).map(e => ({ id: e.id, name: e.name, type: e.type === 'Fulltime' ? 'Full-time' : 'Part-time', baseSalary: e.type === 'Fulltime' ? Number(e.rate) : 0, dailyRate: e.type === 'Parttime' ? Number(e.rate) : 0, status: e.status }));
     const attendanceData = (live.payrollAdmin?.attendance || []).map(a => ({ id: a.id, employeeId: a.employeeId, date: a.date, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, overtimeHours: a.overtimeHours }));
     set({ employees, attendanceData }); return live;
+  },
+
+  previewPayroll: async request => {
+    const result = await rpc('previewPayroll', getPin(), request);
+    return { ...result, employeesData: (result.details || []).map(detail => ({
+      id: String(detail[1]), name: detail[2], rate: Number(detail[3] || 0), present: Number(detail[4] || 0),
+      leave: Number(detail[5] || 0), sick: Number(detail[6] || 0), absent: Number(detail[7] || 0),
+      overtime: Number(detail[8] || 0), adjustment: Number(detail[9] || 0), totalPay: Number(detail[10] || 0), note: detail[11] || ''
+    })) };
+  },
+
+  loadPayrollRunDetail: async runId => {
+    const result = await rpc('getPayrollRunDetail', getPin(), runId);
+    return { ...result, employeesData: (result.details || []).map(detail => ({
+      id: String(detail[1]), name: detail[2], rate: Number(detail[3] || 0), present: Number(detail[4] || 0),
+      leave: Number(detail[5] || 0), sick: Number(detail[6] || 0), absent: Number(detail[7] || 0),
+      overtime: Number(detail[8] || 0), adjustment: Number(detail[9] || 0), totalPay: Number(detail[10] || 0), note: detail[11] || ''
+    })) };
+  },
+
+  savePayrollAdjustments: async (runId, changes) => {
+    const result = await rpc('savePayrollAdjustments', getPin(), { runId, changes });
+    set({ payrollHistory: get().payrollHistory.map(run => run.id === runId ? { ...run, totalAmount: Number(result.total || 0) } : run) });
+    get().addToast('Penyesuaian payroll berhasil disimpan.');
+    return result;
   },
 
   savePayroll: async payrollRun => {

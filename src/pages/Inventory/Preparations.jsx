@@ -8,6 +8,8 @@ import Modal from '../../components/Modal';
 const Preparations = () => {
   const preparations = useStore(s => s.preparations);
   const materials = useStore(s => s.materials);
+  const loadPreparationDetail = useStore(s => s.loadPreparationDetail);
+  const savePreparation = useStore(s => s.savePreparation);
   const [expanded, setExpanded] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({ name: '', unit: 'ml', yield: '', ingredients: [{ id: '', type: 'RAW_MATERIAL', quantity: '', unit: '' }] });
@@ -23,6 +25,15 @@ const Preparations = () => {
       if (mat) newIngs[i].unit = mat.unit;
     }
     setForm({ ...form, ingredients: newIngs });
+  };
+  const toggleDetail = async prep => {
+    if (expanded === prep.id) return setExpanded(null);
+    setExpanded(prep.id);
+    if (!prep.detailLoaded) try { await loadPreparationDetail(prep.id); } catch (error) { useStore.getState().addToast(error.message, 'error'); }
+  };
+  const handleSave = async () => {
+    try { await savePreparation(form); setIsModalOpen(false); setForm({ name: '', unit: 'ml', yield: '', ingredients: [{ id: '', type: 'RAW_MATERIAL', quantity: '', unit: '' }] }); }
+    catch (error) { useStore.getState().addToast(error.message, 'error'); }
   };
 
   return (
@@ -42,7 +53,7 @@ const Preparations = () => {
 
           return (
             <div key={prep.id} className="card">
-              <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpanded(isExpanded ? null : prep.id)} style={{ cursor: 'pointer' }}>
+              <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleDetail(prep)} style={{ cursor: 'pointer' }}>
                 <div className="flex items-center gap-4">
                   <div>
                     <div className="font-semibold text-base">{prep.name}</div>
@@ -133,7 +144,7 @@ const Preparations = () => {
         </div>
         <div className="modal-footer">
           <button className="btn btn-outline" onClick={() => setIsModalOpen(false)}>Batal</button>
-          <button className="btn btn-primary" onClick={() => setIsModalOpen(false)}>Simpan Preparation</button>
+          <button className="btn btn-primary" disabled={!form.name || !form.yield} onClick={handleSave}>Simpan Preparation</button>
         </div>
       </Modal>
     </div>

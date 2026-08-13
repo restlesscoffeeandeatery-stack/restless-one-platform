@@ -7,14 +7,31 @@ const PayrollHistory = () => {
   const payrollHistory = useStore(s => s.payrollHistory);
   const accounts = useStore(s => s.accounts);
   const postPayroll = useStore(s => s.postPayroll);
+  const loadPayrollRunDetail = useStore(s => s.loadPayrollRunDetail);
+  const savePayrollAdjustments = useStore(s => s.savePayrollAdjustments);
   const [selectedRun, setSelectedRun] = useState(null);
   const [accountId, setAccountId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const handlePost = async () => {
     if (!accountId) return useStore.getState().addToast('Pilih rekening pembayaran.', 'error');
     setSubmitting(true);
     try { await postPayroll(selectedRun.id, accountId); setSelectedRun(null); setAccountId(''); }
+    catch (error) { useStore.getState().addToast(error.message, 'error'); }
+    finally { setSubmitting(false); }
+  };
+  const openDetail = async run => {
+    setDetailLoading(true);
+    try { setDetail(await loadPayrollRunDetail(run.id)); }
+    catch (error) { useStore.getState().addToast(error.message, 'error'); }
+    finally { setDetailLoading(false); }
+  };
+  const updateAdjustment = (employeeId, value) => setDetail({ ...detail, employeesData: detail.employeesData.map(row => row.id === employeeId ? { ...row, adjustment: value, totalPay: Math.max(0, row.totalPay - Number(row._previousAdjustment ?? row.adjustment) + Number(value || 0)), _previousAdjustment: Number(row._previousAdjustment ?? row.adjustment) } : row) });
+  const persistAdjustments = async () => {
+    setSubmitting(true);
+    try { await savePayrollAdjustments(detail.runId, detail.employeesData.map(row => ({ employeeId: row.id, adjustment: Number(row.adjustment || 0), note: row.note || '' }))); setDetail(await loadPayrollRunDetail(detail.runId)); }
     catch (error) { useStore.getState().addToast(error.message, 'error'); }
     finally { setSubmitting(false); }
   };
@@ -59,7 +76,7 @@ const PayrollHistory = () => {
                     <td className="font-bold" style={{ color: 'var(--color-primary)' }}>{formatRupiah(totalAmount)}</td>
                     <td>{run.date}</td>
                     <td><span className={`badge ${run.status === 'Paid' ? 'badge-success' : 'badge-warning'}`}>{run.status}</span></td>
-                    <td>{run.status === 'Draft' ? <button className="btn btn-primary btn-sm" onClick={() => setSelectedRun(run)}>Post ke Keuangan</button> : '—'}</td>
+                    <td><div className="flex gap-2"><button className="btn btn-outline btn-sm" onClick={() => openDetail(run)}>{detailLoading ? 'Memuat…' : 'Detail'}</button>{run.status === 'Draft' && <button className="btn btn-primary btn-sm" onClick={() => setSelectedRun(run)}>Post</button>}</div></td>
                   </tr>
                 );
               })}
@@ -80,6 +97,9 @@ const PayrollHistory = () => {
           <button className="btn btn-outline" disabled={submitting} onClick={() => setSelectedRun(null)}>Batal</button>
           <button className="btn btn-primary" disabled={submitting || !accountId} onClick={handlePost}>{submitting ? 'Memposting…' : 'Post & Catat Pengeluaran'}</button>
         </div>
+      </Modal>
+      <Modal isOpen={Boolean(detail)} onClose={() => !submitting && setDetail(null)} title={`Detail Payroll · ${detail?.start || ''} – ${detail?.end || ''}`}>
+        <div className="modal-body"><div className="table-wrapper"><table className="table"><thead><tr><th>Karyawan</th><th>Hadir</th><th>Lembur</th><th>Penyesuaian</th><th>Gaji Bersih</th></tr></thead><tbody>{detail?.employeesData?.map(row => <tr key={row.id}><td className="font-medium">{row.name}<div className="text-xs text-gray-500">{row.note}</div></td><td>{row.present}</td><td>{formatRupiah(row.overtime)}</td><td><input type="number" className="form-control" style={{ width: 140 }} disabled={detail.status === 'POSTED'} value={row.adjustment} onChange={event => updateAdjustment(row.id,event.target.value)}/></td><td className="font-semibold">{formatRupiah(row.totalPay)}</td></tr>)}</tbody></table></div></div><div className="modal-footer"><button className="btn btn-outline" onClick={() => setDetail(null)}>Tutup</button>{detail?.status !== 'POSTED' && <button className="btn btn-primary" disabled={submitting} onClick={persistAdjustments}>{submitting ? 'Menyimpan…' : 'Simpan Perubahan'}</button>}</div>
       </Modal>
     </div>
   );

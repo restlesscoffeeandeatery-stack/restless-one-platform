@@ -14,6 +14,7 @@ const WEEKS = [
 const PartTimePayroll = () => {
   const employees = useStore(s => s.employees.filter(e => e.type === 'Part-time'));
   const savePayroll = useStore(s => s.savePayroll);
+  const previewPayroll = useStore(s => s.previewPayroll);
   const payrollHistory = useStore(s => s.payrollHistory);
   const loadPayroll = useStore(s => s.loadPayroll);
 
@@ -27,13 +28,12 @@ const PartTimePayroll = () => {
     setAttendance({ ...attendance, [empId]: Math.min(Number(days), selectedWeek.days) });
   };
 
-  const handleCalculate = () => {
-    const results = employees.map(emp => {
-      const days = attendance[emp.id] ?? Math.floor(selectedWeek.days * 0.85);
-      const totalPay = Number(emp.dailyRate) * days;
-      return { ...emp, days, totalPay };
-    });
-    setCalculated(results);
+  const handleCalculate = async () => {
+    try {
+      const result = await previewPayroll({ scheme: 'Parttime', start: selectedWeek.start, end: selectedWeek.end });
+      setCalculated(result.employeesData.map(employee => ({ ...employee, dailyRate: employee.rate, days: employee.present })));
+      setAttendance(Object.fromEntries(result.employeesData.map(employee => [employee.id, employee.present])));
+    } catch (error) { useStore.getState().addToast(error.message, 'error'); }
   };
 
   const handleConfirm = async () => {
