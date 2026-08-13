@@ -101,12 +101,12 @@ export const useStore = create((set, get) => ({
     }
     try {
       set(silent ? { refreshing: true, error: '' } : { loading: !get().accounts.length, refreshing: true, error: '' });
-      const inventoryRequest = rpc('getInventoryWorkspace', getPin()).catch(async () => {
+      const inventoryRequest = rpc('getInventoryWorkspace').catch(async () => {
         const [materials, products, preparations] = await Promise.all([rpc('getBahanBaku'), rpc('getProduk'), rpc('getPreparations')]);
         return { materials: (materials.items || []).map(m => ({ ...m, name: m.nama, unit: m.satuan, category: m.kategori, average: m.harga })), products: products.items || [], preparations: preparations.items || [], stockHistory: [] };
       });
       const [finance, inventory, platform] = await Promise.all([
-        rpc('getAppData'), inventoryRequest, rpc('getPlatformData', getPin())
+        rpc('getAppData'), inventoryRequest, rpc('getPlatformData')
       ]);
       const next = normalize(finance, inventory, platform);
       localStorage.setItem(CACHE_KEY, JSON.stringify(next));
@@ -120,7 +120,7 @@ export const useStore = create((set, get) => ({
 
   verifyPin: async pin => {
     localStorage.setItem(PIN_STORAGE_KEY, pin);
-    try { await rpc('verifyAdminLogin', pin); localStorage.setItem(AUTH_STORAGE_KEY, '1'); set({ authenticated: true }); return true; }
+    try { await rpc('verifyAdminLogin'); localStorage.setItem(AUTH_STORAGE_KEY, '1'); set({ authenticated: true }); return true; }
     catch (error) { localStorage.removeItem(PIN_STORAGE_KEY); throw error; }
   },
   logout: () => { localStorage.removeItem(AUTH_STORAGE_KEY); set({ ...emptyState, authenticated: false, loading: false }); },
@@ -150,13 +150,13 @@ export const useStore = create((set, get) => ({
   },
 
   stockOut: async (materialId, quantity, category, date, notes) => {
-    const result = await rpc('postStockMovement', getPin(), { materialId, type: 'KELUAR', qty: Number(quantity), category, date, note: notes });
+    const result = await rpc('postStockMovement', { materialId, type: 'KELUAR', qty: Number(quantity), category, date, note: notes });
     set({ materials: get().materials.map(m => m.id === materialId ? { ...m, stock: Number(result.stock || 0), status: Number(result.stock || 0) <= 0 ? 'Out of Stock' : Number(result.stock || 0) <= 5 ? 'Low Stock' : 'In Stock' } : m), stockHistory: [{ id: `OUT-${Date.now()}`, materialId, date, type: 'OUT', category, reference: notes, qtyIn: 0, qtyOut: Number(quantity), balance: Number(result.stock || 0) }, ...get().stockHistory] });
     get().addToast('Stok keluar berhasil dicatat.');
   },
 
   stockIn: async (materialId, quantity, price, date, notes) => {
-    const result = await rpc('postStockMovement', getPin(), { materialId, type: 'MASUK', qty: Number(quantity), price: Number(price), category: 'Stock In', date, note: notes });
+    const result = await rpc('postStockMovement', { materialId, type: 'MASUK', qty: Number(quantity), price: Number(price), category: 'Stock In', date, note: notes });
     set({ materials: get().materials.map(m => m.id === materialId ? { ...m, stock: Number(result.stock || 0), latestPrice: Number(result.average || price), status: Number(result.stock || 0) <= 5 ? 'Low Stock' : 'In Stock' } : m), stockHistory: [{ id: `IN-${Date.now()}`, materialId, date, type: 'IN', category: 'Stock In', reference: notes, qtyIn: Number(quantity), qtyOut: 0, balance: Number(result.stock || 0) }, ...get().stockHistory] });
     get().addToast('Stok masuk berhasil dicatat.');
   },
@@ -168,7 +168,7 @@ export const useStore = create((set, get) => ({
   },
 
   addMaterial: async data => {
-    const result = await rpc('saveBahan', getPin(), { name: data.name, unit: data.unit, category: data.category, price: Number(data.price || 0), active: true });
+    const result = await rpc('saveBahan', { name: data.name, unit: data.unit, category: data.category, price: Number(data.price || 0), active: true });
     const material = { id: String(result.id), name: data.name, unit: data.unit, category: data.category, stock: 0, latestPrice: Number(data.price || 0), status: 'Out of Stock' };
     set({ materials: [...get().materials, material].sort((a, b) => a.name.localeCompare(b.name)) });
     if (Number(data.openingStock) > 0) await get().stockIn(material.id, Number(data.openingStock), Number(data.price || 0), data.date, 'Stok awal material');
@@ -203,13 +203,13 @@ export const useStore = create((set, get) => ({
 
   updateMaterialPrice: async (materialId, newPrice) => {
     const material = get().materials.find(m => m.id === materialId);
-    await rpc('saveBahan', getPin(), { id: materialId, name: material.name, unit: material.unit, category: material.category, price: Number(newPrice), active: true });
+    await rpc('saveBahan', { id: materialId, name: material.name, unit: material.unit, category: material.category, price: Number(newPrice), active: true });
     get().addToast('Harga bahan dan HPP terkait diperbarui.'); await get().fetchState({ silent: true });
   },
 
   syncAttendance: async () => {
-    await rpc('syncReceivingAndAttendance', getPin());
-    const live = await rpc('refreshPayrollLive', getPin(), '');
+    await rpc('syncReceivingAndAttendance');
+    const live = await rpc('refreshPayrollLive', '');
     const employees = (live.payrollAdmin?.employees || []).map(e => { const full = String(e.type).toLowerCase().replace(/[-\s]/g, '') === 'fulltime'; return { id: String(e.id), name: e.name, type: full ? 'Full-time' : 'Part-time', rate: Number(e.rate), baseSalary: full ? Number(e.rate) : 0, dailyRate: full ? 0 : Number(e.rate), status: e.status, startDate: e.startDate }; });
     const attendanceData = (live.payrollAdmin?.attendance || []).map(a => ({ id: a.id, employeeId: String(a.employeeId), date: a.date, inTime: a.inTime, outTime: a.outTime, status: a.status === 'Hadir' ? 'Present' : a.status, hours: a.hours, note: a.note || '', overtimeHours: a.overtimeHours, overtimeRate: a.overtimeRate }));
     set({ employees, attendanceData }); get().addToast('Absensi dan payroll berhasil disinkronkan.');
@@ -244,7 +244,7 @@ export const useStore = create((set, get) => ({
   },
 
   previewPayroll: async request => {
-    const result = await rpc('previewPayroll', getPin(), request);
+    const result = await rpc('previewPayroll', request);
     return { ...result, employeesData: (result.details || []).map(detail => ({
       id: String(detail[1]), name: detail[2], rate: Number(detail[3] || 0), present: Number(detail[4] || 0),
       leave: Number(detail[5] || 0), sick: Number(detail[6] || 0), absent: Number(detail[7] || 0),
@@ -253,7 +253,7 @@ export const useStore = create((set, get) => ({
   },
 
   loadPayrollRunDetail: async runId => {
-    const result = await rpc('getPayrollRunDetail', getPin(), runId);
+    const result = await rpc('getPayrollRunDetail', runId);
     return { ...result, employeesData: (result.details || []).map(detail => ({
       id: String(detail[1]), name: detail[2], rate: Number(detail[3] || 0), present: Number(detail[4] || 0),
       leave: Number(detail[5] || 0), sick: Number(detail[6] || 0), absent: Number(detail[7] || 0),
@@ -262,7 +262,7 @@ export const useStore = create((set, get) => ({
   },
 
   savePayrollAdjustments: async (runId, changes) => {
-    const result = await rpc('savePayrollAdjustments', getPin(), { runId, changes });
+    const result = await rpc('savePayrollAdjustments', { runId, changes });
     set({ payrollHistory: get().payrollHistory.map(run => run.id === runId ? { ...run, totalAmount: Number(result.total || 0) } : run) });
     get().addToast('Penyesuaian payroll berhasil disimpan.');
     return result;
@@ -272,7 +272,7 @@ export const useStore = create((set, get) => ({
     const request = payrollRun.type === 'Full-time'
       ? { scheme: 'Fulltime', month: payrollRun.month }
       : { scheme: 'Parttime', start: payrollRun.start, end: payrollRun.end };
-    const result = await rpc('generatePayroll', getPin(), request);
+    const result = await rpc('generatePayroll', request);
     const employeesData = (result.details || []).map(detail => ({
       id: String(detail[1]), name: detail[2], rate: Number(detail[3] || 0),
       present: Number(detail[4] || 0), leave: Number(detail[5] || 0), sick: Number(detail[6] || 0),
@@ -289,7 +289,7 @@ export const useStore = create((set, get) => ({
   },
 
   postPayroll: async (runId, accountId) => {
-    await rpc('postPayroll', getPin(), runId, accountId);
+    await rpc('postPayroll', runId, accountId);
     set({ payrollHistory: get().payrollHistory.map(run => run.id === runId ? { ...run, status: 'Paid' } : run) });
     get().addToast('Payroll berhasil diposting ke Keuangan Baru.');
     await get().fetchState({ silent: true });
