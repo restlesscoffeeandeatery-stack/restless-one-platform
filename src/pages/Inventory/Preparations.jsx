@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { formatRupiah } from '../../utils/format';
 import { getPreparationCost } from '../../store/derivedState';
-import { Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import Modal from '../../components/Modal';
 
 const Preparations = () => {
@@ -12,7 +12,26 @@ const Preparations = () => {
   const savePreparation = useStore(s => s.savePreparation);
   const [expanded, setExpanded] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [unitFilter, setUnitFilter] = useState('Semua');
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
   const [form, setForm] = useState({ name: '', unit: 'ml', yield: '', ingredients: [{ id: '', type: 'RAW_MATERIAL', quantity: '', unit: '' }] });
+
+  const units = useMemo(() => [...new Set(preparations.map(prep => prep.unit).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')), [preparations]);
+  const visiblePreparations = useMemo(() => preparations.map(prep => {
+    const totalCost = getPreparationCost(prep, materials, preparations);
+    return { ...prep, totalCost, costPerUnit: prep.yield > 0 ? totalCost / prep.yield : 0 };
+  }).filter(prep => {
+    const matchesSearch = String(prep.name || '').toLowerCase().includes(search.trim().toLowerCase());
+    return matchesSearch && (unitFilter === 'Semua' || prep.unit === unitFilter);
+  }).sort((left, right) => {
+    const a = left[sortKey]; const b = right[sortKey];
+    const comparison = typeof a === 'number' || typeof b === 'number'
+      ? Number(a || 0) - Number(b || 0)
+      : String(a || '').localeCompare(String(b || ''), 'id', { sensitivity: 'base' });
+    return sortDirection === 'asc' ? comparison : -comparison;
+  }), [preparations, materials, search, unitFilter, sortKey, sortDirection]);
 
   const addIngredient = () => setForm({ ...form, ingredients: [...form.ingredients, { id: '', type: 'RAW_MATERIAL', quantity: '', unit: '' }] });
   const removeIngredient = (i) => setForm({ ...form, ingredients: form.ingredients.filter((_, idx) => idx !== i) });
@@ -45,10 +64,20 @@ const Preparations = () => {
         </button>
       </div>
 
+      <section className="card mb-4" aria-label="Filter dan urutan preparation">
+        <div className="flex gap-4 items-end" style={{ flexWrap: 'wrap' }}>
+          <div className="form-group mb-0" style={{ flex: '1 1 240px' }}><label className="form-label" htmlFor="prep-search">Cari Preparation</label><div style={{ position: 'relative' }}><Search size={16} aria-hidden="true" style={{ position: 'absolute', left: 11, top: 12, color: 'var(--color-gray-400)' }}/><input id="prep-search" type="search" className="form-control" style={{ paddingLeft: 34 }} placeholder="Cari nama…" value={search} onChange={event => setSearch(event.target.value)}/></div></div>
+          <div className="form-group mb-0" style={{ flex: '1 1 150px' }}><label className="form-label" htmlFor="prep-unit-filter">Unit</label><select id="prep-unit-filter" className="form-control" value={unitFilter} onChange={event => setUnitFilter(event.target.value)}><option>Semua</option>{units.map(unit => <option key={unit}>{unit}</option>)}</select></div>
+          <div className="form-group mb-0" style={{ flex: '1 1 190px' }}><label className="form-label" htmlFor="prep-sort">Urutkan Berdasarkan</label><select id="prep-sort" className="form-control" value={sortKey} onChange={event => setSortKey(event.target.value)}><option value="name">Preparation</option><option value="unit">Unit</option><option value="yield">Yield</option><option value="totalCost">Total Biaya / HPP</option><option value="costPerUnit">Biaya per Unit</option></select></div>
+          <div className="form-group mb-0" style={{ flex: '1 1 150px' }}><label className="form-label" htmlFor="prep-sort-direction">Arah Urutan</label><select id="prep-sort-direction" className="form-control" value={sortDirection} onChange={event => setSortDirection(event.target.value)}><option value="asc">Kecil → Besar / A–Z</option><option value="desc">Besar → Kecil / Z–A</option></select></div>
+        </div>
+        <div className="text-xs text-gray-500 mt-2" role="status">Menampilkan {visiblePreparations.length} dari {preparations.length} preparation.</div>
+      </section>
+
       <div className="flex-col gap-4" style={{ display: 'flex', gap: '1rem' }}>
-        {preparations.map(prep => {
-          const cost = getPreparationCost(prep, materials, preparations);
-          const costPerUnit = prep.yield > 0 ? cost / prep.yield : 0;
+        {visiblePreparations.map(prep => {
+          const cost = prep.totalCost;
+          const costPerUnit = prep.costPerUnit;
           const isExpanded = expanded === prep.id;
 
           return (
@@ -109,6 +138,7 @@ const Preparations = () => {
             </div>
           );
         })}
+        {visiblePreparations.length === 0 && <div className="card empty-state" role="status">Preparation tidak ditemukan untuk filter yang dipilih.</div>}
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Preparation">
