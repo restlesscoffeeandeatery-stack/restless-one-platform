@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { formatRupiah } from '../../utils/format';
-import { Calculator, CheckCircle } from 'lucide-react';
+import { Calculator, CheckCircle, RefreshCw } from 'lucide-react';
 import Modal from '../../components/Modal';
 
 const iso = date => date.toISOString().slice(0, 10);
@@ -18,6 +18,7 @@ const WEEKS = buildWeeks();
 
 const PartTimePayroll = () => {
   const savePayroll = useStore(s => s.savePayroll);
+  const savePayrollAdjustments = useStore(s => s.savePayrollAdjustments);
   const previewPayroll = useStore(s => s.previewPayroll);
   const payrollHistory = useStore(s => s.payrollHistory);
 
@@ -26,10 +27,13 @@ const PartTimePayroll = () => {
   const [calculated, setCalculated] = useState(null);
   const [loadingPayroll, setLoadingPayroll] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [attendanceDirty, setAttendanceDirty] = useState(false);
+  const [savingPayroll, setSavingPayroll] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const applyPreview = result => {
     setCalculated(result.employeesData.map(employee => ({ ...employee, dailyRate: employee.rate, days: employee.present })));
     setAttendance(Object.fromEntries(result.employeesData.map(employee => [employee.id, employee.present])));
+    setAttendanceDirty(false);
   };
 
   useEffect(() => {
@@ -43,7 +47,19 @@ const PartTimePayroll = () => {
   }, []); // tarik sekali setiap halaman dibuka
 
   const handleAttendanceChange = (empId, days) => {
-    setAttendance({ ...attendance, [empId]: Math.min(Number(days), selectedWeek.days) });
+    const value = Math.max(0, Math.min(Number(days || 0), selectedWeek.days));
+    setAttendance({ ...attendance, [empId]: value });
+    setAttendanceDirty(true);
+  };
+
+  const handleUpdateFee = () => {
+    setCalculated(current => (current || []).map(employee => {
+      const days = Number(attendance[employee.id] ?? employee.days ?? 0);
+      const existingDifference = Number(employee.totalPay || 0) - Number(employee.dailyRate || 0) * Number(employee.days || 0);
+      return { ...employee, days, present: days, totalPay: Math.max(0, Number(employee.dailyRate || 0) * days + existingDifference) };
+    }));
+    setAttendanceDirty(false);
+    useStore.getState().addToast('Fee part-time sudah disesuaikan dengan kehadiran.');
   };
 
   const handleCalculate = async () => {
@@ -57,16 +73,20 @@ const PartTimePayroll = () => {
   };
 
   const handleConfirm = async () => {
-    await savePayroll({
-      id: `pr_pt_${Date.now()}`,
-      period: selectedWeek.label,
-      type: 'Part-time',
-      start: selectedWeek.start,
-      end: selectedWeek.end
-    });
-    setIsConfirmOpen(false);
-    setCalculated(null);
-    setAttendance({});
+    setSavingPayroll(true);
+    try {
+      const desiredPayroll = calculated || [];
+      const result = await savePayroll({ id: `pr_pt_${Date.now()}`, period: selectedWeek.label, type: 'Part-time', start: selectedWeek.start, end: selectedWeek.end });
+      const generatedById = Object.fromEntries(result.employeesData.map(employee => [employee.id, employee]));
+      const changes = desiredPayroll.map(employee => {
+        const generated = generatedById[employee.id];
+        const generatedTotal = Number(generated?.totalPay || 0);
+        return { employeeId: employee.id, adjustment: Number(generated?.adjustment || 0) + Number(employee.totalPay || 0) - generatedTotal, note: employee.note || '', changed: Number(employee.totalPay || 0) !== generatedTotal };
+      }).filter(change => change.changed).map(change => ({ employeeId: change.employeeId, adjustment: change.adjustment, note: change.note }));
+      if (changes.length) await savePayrollAdjustments(result.id, changes);
+      setIsConfirmOpen(false); setCalculated(null); setAttendance({}); setAttendanceDirty(false);
+    } catch (error) { useStore.getState().addToast(error.message, 'error'); }
+    finally { setSavingPayroll(false); }
   };
 
   return (
@@ -79,7 +99,7 @@ const PartTimePayroll = () => {
         <div className="flex gap-4 items-end">
           <div className="form-group mb-0" style={{ flex: 1 }}>
             <label className="form-label">Pilih Minggu</label>
-            <select className="form-control" value={selectedWeek.label} onChange={e => { setSelectedWeek(WEEKS.find(w => w.label === e.target.value)); setCalculated(null); }}>
+            <select className="form-control" value={selectedWeek.label} onChange={e => { setSelectedWeek(WEEKS.find(w => w.label === e.target.value)); setCalculated(null); setAttendance({}); setAttendanceDirty(false); }}>
               {WEEKS.map(w => <option key={w.label} value={w.label}>{w.label}</option>)}
             </select>
           </div>
@@ -91,7 +111,7 @@ const PartTimePayroll = () => {
 
       {/* Input Attendance */}
       <div className="card mb-6">
-        <h3 className="font-semibold mb-4">Input Kehadiran — {selectedWeek.label}</h3>
+        <div className="flex justify-between items-center mb-4" style={{gap:'1rem',flexWrap:'wrap'}}><div><h3 className="font-semibold">Input Kehadiran — {selectedWeek.label}</h3>{attendanceDirty&&<p className="text-xs text-gray-500 mt-1" role="status">Kehadiran berubah. Tekan Update Fee untuk menerapkan perhitungan baru.</p>}</div><button type="button" className="btn btn-outline" disabled={!calculated?.length||!attendanceDirty} onClick={handleUpdateFee}><RefreshCw size={16} style={{marginRight:6}}/>Update Fee</button></div>
         <table className="table">
           <thead>
             <tr><th>Karyawan</th><th>Jabatan</th><th>Rate Harian</th><th>Hari Hadir</th></tr>
@@ -120,7 +140,7 @@ const PartTimePayroll = () => {
         <div className="card">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold">Hasil Kalkulasi</h3>
-            <button className="btn" disabled={!calculated.length} style={{ backgroundColor: 'var(--color-success)', color: 'white' }} onClick={() => setIsConfirmOpen(true)}>
+            <button className="btn" disabled={!calculated.length||attendanceDirty} style={{ backgroundColor: 'var(--color-success)', color: 'white' }} onClick={() => setIsConfirmOpen(true)}>
               <CheckCircle size={16} style={{ marginRight: 6 }} /> Review & Konfirmasi
             </button>
           </div>
@@ -175,7 +195,7 @@ const PartTimePayroll = () => {
         </div>
         <div className="modal-footer">
           <button className="btn btn-outline" onClick={() => setIsConfirmOpen(false)}>Batal</button>
-          <button className="btn btn-primary" onClick={handleConfirm}>Buat Draft Payroll</button>
+          <button className="btn btn-primary" disabled={savingPayroll} onClick={handleConfirm}>{savingPayroll?'Menyimpan…':'Buat Draft Payroll'}</button>
         </div>
       </Modal>
     </div>

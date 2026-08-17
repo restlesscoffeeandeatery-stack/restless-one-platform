@@ -229,6 +229,24 @@ export const useStore = create((set, get) => ({
     set({ employees, attendanceData }); return live;
   },
 
+  saveAttendance: async form => {
+    const result = await rpc('savePayrollAttendance', {
+      employeeId: form.employeeId,
+      date: form.date,
+      status: form.status,
+      inTime: form.inTime || '',
+      outTime: form.outTime || '',
+      hours: Number(form.hours || 0),
+      overtimeHours: Number(form.overtimeHours || 0),
+      overtimeRate: Number(form.overtimeRate || 0),
+      note: form.note || ''
+    });
+    const row = { ...form, id: result.id, employeeId: String(form.employeeId), hours: Number(form.hours || 0), overtimeHours: Number(form.overtimeHours || 0), overtimeRate: Number(form.overtimeRate || 0), status: form.status === 'Hadir' ? 'Present' : form.status };
+    set({ attendanceData: [row, ...get().attendanceData.filter(item => item.id !== result.id)] });
+    get().addToast('Absensi manual berhasil disimpan.');
+    return row;
+  },
+
   saveEmployee: async form => {
     const type = form.type === 'Full-time' ? 'Fulltime' : 'Parttime';
     const rate = type === 'Fulltime' ? Number(form.baseSalary || form.rate) : Number(form.dailyRate || form.rate);
