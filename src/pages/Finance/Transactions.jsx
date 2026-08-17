@@ -1,14 +1,23 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { formatRupiah } from '../../utils/format';
-import { Plus, Search, ArrowDownLeft, ArrowUpRight, ArrowRightLeft, Pencil } from 'lucide-react';
+import { Plus, Search, ArrowDownLeft, ArrowUpRight, ArrowRightLeft, Pencil, CheckCircle2, LoaderCircle } from 'lucide-react';
 import Modal from '../../components/Modal';
+
+const emptyTransaction = () => ({
+  type: 'Expense', date: new Date().toISOString().split('T')[0],
+  category: '', description: '', accountId: '', amount: '', notes: ''
+});
+
+const amountDigits = value => String(value ?? '').replace(/\D/g, '');
+const formatAmountInput = value => amountDigits(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
 const Transactions = () => {
   const transactions = useStore(s => s.transactions);
   const accounts = useStore(s => s.accounts);
   const addTransaction = useStore(s => s.addTransaction);
   const updateTransaction = useStore(s => s.updateTransaction);
+  const addToast = useStore(s => s.addToast);
   const categories = useStore(s => s.categories);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,31 +25,50 @@ const Transactions = () => {
   const [filterType, setFilterType] = useState('');
   const [filterAccount, setFilterAccount] = useState('');
   const [editingId, setEditingId] = useState('');
+  const [saveState, setSaveState] = useState('idle');
 
-  const [form, setForm] = useState({
-    type: 'Expense', date: new Date().toISOString().split('T')[0],
-    category: '', description: '', accountId: '', amount: '', notes: ''
-  });
+  const [form, setForm] = useState(emptyTransaction);
+
+  const closeModal = () => {
+    if (saveState === 'saving') return;
+    setIsModalOpen(false);
+    setSaveState('idle');
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (editingId) await updateTransaction({ ...form, id: editingId });
-    else await addTransaction(form);
-    setIsModalOpen(false);
-    setEditingId('');
-    setForm({ type: 'Expense', date: new Date().toISOString().split('T')[0], category: '', description: '', accountId: '', amount: '', notes: '' });
+    if (saveState !== 'idle') return;
+
+    setSaveState('saving');
+    try {
+      const payload = { ...form, amount: Number(form.amount) };
+      if (editingId) await updateTransaction({ ...payload, id: editingId });
+      else await addTransaction(payload);
+
+      setSaveState('success');
+      await new Promise(resolve => window.setTimeout(resolve, 750));
+      setIsModalOpen(false);
+      setEditingId('');
+      setForm(emptyTransaction());
+      setSaveState('idle');
+    } catch (error) {
+      setSaveState('idle');
+      addToast(error?.message || 'Transaksi gagal disimpan. Silakan coba lagi.', 'error');
+    }
   };
 
   const openAdd = () => {
     setEditingId('');
-    setForm({ type: 'Expense', date: new Date().toISOString().split('T')[0], category: '', description: '', accountId: '', amount: '', notes: '' });
+    setForm(emptyTransaction());
+    setSaveState('idle');
     setIsModalOpen(true);
   };
 
   const openEdit = transaction => {
     setEditingId(transaction.id);
     setForm({ type: transaction.type, date: transaction.date, category: transaction.category || '', description: transaction.description || '',
-      accountId: transaction.accountId || '', amount: transaction.amount, notes: transaction.notes || '' });
+      accountId: transaction.accountId || '', amount: amountDigits(Math.round(Number(transaction.amount) || 0)), notes: transaction.notes || '' });
+    setSaveState('idle');
     setIsModalOpen(true);
   };
 
@@ -131,7 +159,7 @@ const Transactions = () => {
         </div>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Edit Transaction' : 'Add Transaction'}>
+      <Modal isOpen={isModalOpen} onClose={closeModal} title={editingId ? 'Edit Transaction' : 'Add Transaction'}>
         <form onSubmit={handleSave}>
           <div className="modal-body flex-col gap-4">
             <div className="flex gap-4">
@@ -168,17 +196,34 @@ const Transactions = () => {
               </div>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">Amount (Rp)</label>
-                <input type="number" className="form-control" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} required min="1" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="form-control transaction-amount-input"
+                  value={formatAmountInput(form.amount)}
+                  onChange={e => setForm({ ...form, amount: amountDigits(e.target.value) })}
+                  placeholder="0"
+                  aria-label="Jumlah transaksi dalam Rupiah"
+                  required
+                />
               </div>
             </div>
             <div className="form-group">
               <label className="form-label">Notes</label>
               <textarea className="form-control" rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
+            <div className={`transaction-save-status ${saveState}`} role="status" aria-live="polite" aria-atomic="true">
+              {saveState === 'saving' && <><LoaderCircle size={20} className="spin" /> Menyimpan transaksi ke server…</>}
+              {saveState === 'success' && <><CheckCircle2 size={22} className="transaction-save-check" /> Transaksi berhasil tersimpan</>}
+            </div>
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">{editingId ? 'Save Changes' : 'Save Transaction'}</button>
+            <button type="button" className="btn btn-outline" onClick={closeModal} disabled={saveState === 'saving'}>Cancel</button>
+            <button type="submit" className={`btn btn-primary transaction-save-button ${saveState}`} disabled={saveState !== 'idle' || !Number(form.amount)}>
+              {saveState === 'saving' && <><LoaderCircle size={16} className="spin" /> Menyimpan…</>}
+              {saveState === 'success' && <><CheckCircle2 size={16} /> Tersimpan</>}
+              {saveState === 'idle' && (editingId ? 'Save Changes' : 'Save Transaction')}
+            </button>
           </div>
         </form>
       </Modal>
