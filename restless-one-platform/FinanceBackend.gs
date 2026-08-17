@@ -3,6 +3,7 @@
     TRANSACTIONS: 'Transaksi',
     CATEGORIES: 'Kategori',
     INVOICES: 'Invoice',
+    SUPPLIERS: 'Supplier',
     BUDGETS: 'Target Budget',
     ACCOUNTS: 'Rekening',
     ALLOCATION_RULES: 'Aturan Alokasi'
@@ -22,6 +23,7 @@
     definitions[SHEETS.TRANSACTIONS] = ['ID', 'Tanggal', 'Tipe', 'Jumlah', 'Deskripsi', 'Kategori', 'Sub Kategori', 'Metode', 'Catatan', 'Rekening Asal', 'Rekening Tujuan', 'Referensi', 'Periode', 'Dibuat', 'Diubah'];
     definitions[SHEETS.CATEGORIES] = ['ID', 'Tipe', 'Nama', 'Kategori Induk', 'Rekening', 'Aktif', 'Diubah'];
     definitions[SHEETS.INVOICES] = ['ID', 'Nomor', 'Supplier', 'Kategori', 'Sub Kategori', 'Rekening Pembayaran', 'Email', 'Tanggal Invoice', 'Jatuh Tempo', 'Status', 'Item JSON', 'Subtotal', 'Pajak', 'Diskon', 'Total', 'Catatan', 'ID Transaksi', 'Dibuat', 'Diubah'];
+    definitions[SHEETS.SUPPLIERS] = ['ID', 'Nama', 'Kontak', 'Telepon', 'Email', 'Alamat', 'Aktif', 'Dibuat', 'Diubah'];
     definitions[SHEETS.BUDGETS] = ['ID', 'Nama Target', 'Nominal Target', 'Terkumpul', 'Deadline', 'Catatan', 'Dibuat', 'Diubah'];
     definitions[SHEETS.ACCOUNTS] = ['ID', 'Nama', 'Jenis', 'Saldo Awal', 'Aktif', 'Prioritas', 'Diubah'];
     definitions[SHEETS.ALLOCATION_RULES] = ['ID', 'ID Rekening', 'Metode', 'Nilai', 'Periode', 'Hari Jatuh Tempo', 'Prioritas', 'Aktif', 'Diubah'];
@@ -171,6 +173,7 @@
     var transactionRows = financeSheetRows_(ss.getSheetByName(SHEETS.TRANSACTIONS), 15);
     var categoryRows = financeSheetRows_(ss.getSheetByName(SHEETS.CATEGORIES), 7);
     var invoiceRows = financeSheetRows_(ss.getSheetByName(SHEETS.INVOICES), 19);
+    var supplierRows = financeSheetRows_(ss.getSheetByName(SHEETS.SUPPLIERS), 9);
     var budgetRows = financeSheetRows_(ss.getSheetByName(SHEETS.BUDGETS), 8);
     var accountRows = financeSheetRows_(ss.getSheetByName(SHEETS.ACCOUNTS), 7);
     var ruleRows = financeSheetRows_(ss.getSheetByName(SHEETS.ALLOCATION_RULES), 9);
@@ -182,6 +185,7 @@
       transactions: transactions,
       categories: categories,
       invoices: financeInvoicesFromRows_(invoiceRows),
+      suppliers: financeSuppliersFromRows_(supplierRows),
       budgets: financeBudgetsFromRows_(budgetRows),
       accounts: financeAccountsFromRows_(accountRows, allocationRules, transactionRows),
       allocationRules: allocationRules,
@@ -224,6 +228,13 @@
         items: items, subtotal: number_(r[11]), tax: number_(r[12]), discount: number_(r[13]), total: number_(r[14]),
         note: r[15], transactionId: r[16] || '' };
     }).sort(function(a, b) { return b.invoiceDate.localeCompare(a.invoiceDate); });
+  }
+
+  function financeSuppliersFromRows_(rows) {
+    return rows.map(function(r) {
+      return { id: r[0], name: r[1], contact: r[2] || '', phone: r[3] || '', email: r[4] || '', address: r[5] || '',
+        active: r[6] === true || String(r[6]).toLowerCase() === 'true' };
+    }).filter(function(item) { return item.active && item.name; }).sort(function(a, b) { return String(a.name).localeCompare(String(b.name)); });
   }
 
   function financeBudgetsFromRows_(rows) {
@@ -414,6 +425,23 @@
       sheet.appendRow(values);
     }
     return { ok: true, refreshRequired: true };
+  }
+
+  function saveSupplier(payload) {
+    ensureDatabase_();
+    payload = payload || {};
+    var name = clean_(payload.name);
+    if (!name) throw new Error('Nama supplier wajib diisi.');
+    var sheet = platformSS_().getSheetByName(SHEETS.SUPPLIERS);
+    var rows = financeSheetRows_(sheet, 9);
+    var duplicate = rows.some(function(row) { return String(row[1] || '').trim().toLowerCase() === name.toLowerCase(); });
+    if (duplicate) throw new Error('Supplier dengan nama tersebut sudah tersedia.');
+    var now = new Date();
+    var id = 'SUP-' + Utilities.getUuid();
+    var saved = { id: id, name: name, contact: clean_(payload.contact), phone: clean_(payload.phone),
+      email: clean_(payload.email), address: clean_(payload.address), active: true };
+    sheet.appendRow([saved.id, saved.name, saved.contact, saved.phone, saved.email, saved.address, true, now, now]);
+    return saved;
   }
 
   function updateInvoiceStatus(id, status) {

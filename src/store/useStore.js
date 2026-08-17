@@ -42,12 +42,20 @@ function normalize(finance = {}, inventory = {}, platform = {}) {
     amount: Number(t.amount || 0), status: 'Completed', notes: t.note || '', reference: t.reference || '', period: t.period || ''
   }));
   const rawInvoices = finance.invoices || [];
-  const supplierNames = [...new Set(rawInvoices.map(i => String(i.supplier || i.client || '').trim()).filter(Boolean))];
+  const savedSuppliers = (finance.suppliers || []).filter(s => s.active !== false);
+  const supplierKey = name => String(name || '').trim().toLocaleLowerCase('id-ID');
+  const supplierNames = [
+    ...savedSuppliers.map(s => String(s.name || '').trim()),
+    ...rawInvoices.map(i => String(i.supplier || i.client || '').trim())
+  ].filter(Boolean).reduce((names, name) => names.some(current => supplierKey(current) === supplierKey(name)) ? names : [...names, name], []);
   const suppliers = supplierNames.map((name, index) => {
-    const rows = rawInvoices.filter(i => (i.supplier || i.client) === name);
-    return { id: `SUP-${index + 1}`, name, contact: '-', phone: '-', totalPurchases: rows.reduce((s, i) => s + Number(i.total || 0), 0), outstanding: rows.filter(i => i.status !== 'Dibayar').reduce((s, i) => s + Number(i.total || 0), 0) };
+    const saved = savedSuppliers.find(s => supplierKey(s.name) === supplierKey(name));
+    const rows = rawInvoices.filter(i => supplierKey(i.supplier || i.client) === supplierKey(name));
+    return { id: String(saved?.id || `SUP-LEGACY-${index + 1}`), name, contact: saved?.contact || '-', phone: saved?.phone || '-',
+      email: saved?.email || '', address: saved?.address || '', active: saved?.active !== false,
+      totalPurchases: rows.reduce((s, i) => s + Number(i.total || 0), 0), outstanding: rows.filter(i => i.status !== 'Dibayar').reduce((s, i) => s + Number(i.total || 0), 0) };
   });
-  const supplierId = name => suppliers.find(s => s.name === name)?.id || '';
+  const supplierId = name => suppliers.find(s => supplierKey(s.name) === supplierKey(name))?.id || '';
   const invoices = rawInvoices.map(i => ({
     id: String(i.id), supplierId: supplierId(i.supplier || i.client), supplierName: i.supplier || i.client,
     invoiceNo: i.number, date: i.invoiceDate, dueDate: i.dueDate, total: Number(i.total || 0),
@@ -146,6 +154,15 @@ export const useStore = create((set, get) => ({
       subcategory: selectedCategory.parent ? selectedCategory.name : '', status: 'Draft', tax: 0, discount: 0,
       items: items.map(item => ({ materialId: item.materialId, name: get().materials.find(m => m.id === item.materialId)?.name || item.materialId, qty: Number(item.quantity), price: Number(item.price) })) });
     get().addToast('Invoice tersimpan; stok dan harga rata-rata sudah diperbarui.'); await get().fetchState({ silent: true });
+  },
+
+  addSupplier: async data => {
+    const saved = await rpc('saveSupplier', data);
+    const supplier = { id: String(saved.id), name: saved.name, contact: saved.contact || '-', phone: saved.phone || '-',
+      email: saved.email || '', address: saved.address || '', active: true, totalPurchases: 0, outstanding: 0 };
+    set({ suppliers: [...get().suppliers.filter(item => item.id !== supplier.id), supplier].sort((a, b) => a.name.localeCompare(b.name, 'id')) });
+    get().addToast('Supplier berhasil ditambahkan.');
+    return supplier;
   },
 
   recordPayment: async (invoiceId, amount) => {

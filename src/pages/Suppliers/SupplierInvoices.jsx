@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { formatRupiah } from '../../utils/format';
 import Modal from '../../components/Modal';
+import SearchableSelect from '../../components/SearchableSelect';
 import { Plus } from 'lucide-react';
 
 const SupplierInvoices = () => {
@@ -36,6 +37,11 @@ const SupplierInvoices = () => {
   const activeInvoices = invoices.filter(i => i.status !== 'Paid');
   const paidInvoices = invoices.filter(i => i.status === 'Paid');
   const displayedInvoices = activeTab === 'active' ? activeInvoices : paidInvoices;
+  const materialOptions = useMemo(() => materials.map(material => ({
+    value: material.id,
+    label: `${material.name} (${material.unit})`,
+    meta: material.category || ''
+  })), [materials]);
 
   const handleAddItem = () => {
     setInvoiceItems([...invoiceItems, { materialId: '', quantity: 1, price: 0 }]);
@@ -56,6 +62,10 @@ const SupplierInvoices = () => {
 
   const handleCreateInvoice = (e) => {
     e.preventDefault();
+    if (invoiceItems.some(item => !item.materialId)) {
+      useStore.getState().addToast('Pilih material yang valid pada setiap item invoice.', 'error');
+      return;
+    }
     createInvoice(newInvoice, invoiceItems).then(() => {
       setIsAddModalOpen(false);
       setNewInvoice({ supplierId: '', invoiceNo: '', date: new Date().toISOString().split('T')[0], dueDate: '' });
@@ -197,10 +207,17 @@ const SupplierInvoices = () => {
               <h4 className="font-semibold mb-2">Invoice Items</h4>
               {invoiceItems.map((item, idx) => (
                 <div key={idx} className="flex gap-2 items-center mb-2">
-                  <select className="form-control" style={{ flex: 2 }} required value={item.materialId} onChange={e => handleItemChange(idx, 'materialId', e.target.value)}>
-                    <option value="">Select Material...</option>
-                    {materials.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}
-                  </select>
+                  <div style={{ flex: 2, minWidth: 220 }}>
+                    <SearchableSelect
+                      id={`invoice-material-${idx}`}
+                      value={item.materialId}
+                      onChange={value => handleItemChange(idx, 'materialId', value)}
+                      options={materialOptions}
+                      placeholder="Cari material..."
+                      ariaLabel={`Cari material untuk item ${idx + 1}`}
+                      required
+                    />
+                  </div>
                   <input type="number" className="form-control" placeholder="Qty" style={{ flex: 1 }} required value={item.quantity} onChange={e => handleItemChange(idx, 'quantity', Number(e.target.value))} />
                   <input type="number" className="form-control" placeholder="Price" style={{ flex: 1 }} required value={item.price} onChange={e => handleItemChange(idx, 'price', Number(e.target.value))} />
                   <div className="font-semibold text-right" style={{ width: '100px' }}>

@@ -1,14 +1,34 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { formatRupiah } from '../../utils/format';
-import { Building2, Phone, Package, ChevronRight } from 'lucide-react';
+import { Building2, Phone, Package, ChevronRight, Plus, LoaderCircle } from 'lucide-react';
 import Modal from '../../components/Modal';
 
 const Suppliers = () => {
   const suppliers = useStore(s => s.suppliers);
   const invoices = useStore(s => s.invoices);
+  const addSupplier = useStore(s => s.addSupplier);
+  const addToast = useStore(s => s.addToast);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState('');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: '', contact: '', phone: '', email: '', address: '' });
+
+  const handleAddSupplier = async event => {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    try {
+      await addSupplier(form);
+      setForm({ name: '', contact: '', phone: '', email: '', address: '' });
+      setIsAddOpen(false);
+    } catch (error) {
+      addToast(error?.message || 'Supplier gagal disimpan.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const filtered = suppliers.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -23,7 +43,10 @@ const Suppliers = () => {
     <div className="page-container">
       <div className="flex justify-between items-center mb-6">
         <h1 className="page-title" style={{ margin: 0 }}>Suppliers</h1>
-        <input className="form-control" style={{ width: 260 }} placeholder="Search supplier..." value={search} onChange={e => setSearch(e.target.value)} />
+        <div className="supplier-toolbar">
+          <input className="form-control" placeholder="Search supplier..." aria-label="Cari supplier" value={search} onChange={e => setSearch(e.target.value)} />
+          <button type="button" className="btn btn-primary" onClick={() => setIsAddOpen(true)}><Plus size={16} /> Tambah Supplier</button>
+        </div>
       </div>
 
       <div className="card">
@@ -65,9 +88,44 @@ const Suppliers = () => {
                 </td>
               </tr>
             ))}
+            {!filtered.length && <tr><td colSpan="6" className="empty-state">Supplier tidak ditemukan.</td></tr>}
           </tbody>
         </table>
       </div>
+
+      <Modal isOpen={isAddOpen} onClose={() => !saving && setIsAddOpen(false)} title="Tambah Supplier">
+        <form onSubmit={handleAddSupplier}>
+          <div className="modal-body flex-col gap-4">
+            <div className="form-group">
+              <label className="form-label" htmlFor="supplier-name">Nama Supplier</label>
+              <input id="supplier-name" className="form-control" required autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Contoh: PT Sumber Pangan" />
+            </div>
+            <div className="flex gap-4">
+              <div className="form-group flex-1">
+                <label className="form-label" htmlFor="supplier-contact">Nama Kontak</label>
+                <input id="supplier-contact" className="form-control" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="Nama sales/PIC" />
+              </div>
+              <div className="form-group flex-1">
+                <label className="form-label" htmlFor="supplier-phone">Nomor Telepon</label>
+                <input id="supplier-phone" type="tel" inputMode="tel" className="form-control" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="08xxxxxxxxxx" />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="supplier-email">Email</label>
+              <input id="supplier-email" type="email" className="form-control" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="supplier@email.com" />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="supplier-address">Alamat</label>
+              <textarea id="supplier-address" className="form-control" rows="3" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Alamat supplier" />
+            </div>
+            <div className="text-xs text-gray-500" role="status" aria-live="polite">{saving ? 'Menyimpan supplier ke spreadsheet…' : 'Nama supplier wajib diisi. Data lainnya dapat dilengkapi bila tersedia.'}</div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-outline" disabled={saving} onClick={() => setIsAddOpen(false)}>Batal</button>
+            <button type="submit" className="btn btn-primary" disabled={saving || !form.name.trim()}>{saving ? <><LoaderCircle size={16} className="spin" /> Menyimpan…</> : 'Simpan Supplier'}</button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={selected?.name}>
         <div className="modal-body flex-col gap-4">
